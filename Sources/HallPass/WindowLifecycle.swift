@@ -130,6 +130,8 @@ struct WindowConnection: NSViewRepresentable {
                     var view = hit
                     while let current = view {
                         if let table = current as? NSTableView {
+                            let tablePoint = table.convert(event.locationInWindow, from: nil)
+                            FileHandle.standardOutput.write(Data("Native table point: \(tablePoint), row=\(table.row(at: tablePoint)), frame=\(table.frame)\n".utf8))
                             DispatchQueue.main.async {
                                 FileHandle.standardOutput.write(Data("Native selected rows: \(table.selectedRowIndexes)\n".utf8))
                             }

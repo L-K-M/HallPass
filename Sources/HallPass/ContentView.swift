@@ -141,15 +141,18 @@ struct ContentView: View {
     }
 
     private var detail: some View {
-        Group {
-            if model.isLoaded {
-                networkTable
-            } else {
-                welcome
+        VStack(spacing: 0) {
+            notices
+            Group {
+                if model.isLoaded {
+                    networkTable
+                } else {
+                    welcome
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            statusBar
         }
-        .safeAreaInset(edge: .top, spacing: 0) { notices }
-        .safeAreaInset(edge: .bottom, spacing: 0) { statusBar }
         // Bound wrapping before the split view measures its minimum size.
         .frame(minWidth: 430, maxWidth: .infinity, maxHeight: .infinity)
     }
