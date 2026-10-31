@@ -243,18 +243,25 @@ end numberOfRanges
 
 on clickRange(rowIndex)
     set rangeTable to my networkTable()
-    tell application "System Events"
+    tell application "System Events" to tell process "HallPass"
+        set frontmost to true
         set targetRow to get row rowIndex of rangeTable
         log (get role of targetRow)
         set rowPosition to get position of targetRow
         set rowSize to get size of targetRow
+        log rowPosition
+        log rowSize
         click at {(item 1 of rowPosition) + (item 1 of rowSize) / 2, (item 2 of rowPosition) + (item 2 of rowSize) / 2}
+        delay pollDelay
+        log (count selected rows of rangeTable)
     end tell
     delay pollDelay
 end clickRange
 
 on assertCopiedRanges()
-    if paragraphs of (the clipboard as text) is not {"169.254.0.0/16", "192.168.1.0/24"} then error "Copy did not include both selected ranges."
+    set probe to "import AppKit; let board = NSPasteboard.general; if let text = board.string(forType: .string) { print(text) } else { print(\"Clipboard has no text: \\(String(describing: board.types))\"); exit(1) }"
+    set copiedText to do shell script "/usr/bin/xcrun swift -e " & quoted form of probe
+    if paragraphs of copiedText is not {"169.254.0.0/16", "192.168.1.0/24"} then error "Copy did not include both selected ranges."
 end assertCopiedRanges
 
 on requireBackupFile(filePath)
