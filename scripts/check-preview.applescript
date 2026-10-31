@@ -13,6 +13,8 @@ my requirePreview()
 set backupFolder to POSIX path of (path to temporary items)
 set backupName to "HallPass-UI-" & (do shell script "/usr/bin/uuidgen") & ".json"
 set backupFile to backupFolder & backupName
+log "Check table mouse selection before any focus transitions"
+my clickRange(1)
 tell application "System Events"
     tell process "HallPass"
         log "Open editor with CmdN"
