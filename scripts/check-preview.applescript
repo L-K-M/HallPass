@@ -21,7 +21,8 @@ tell application "System Events"
         -- Some accessibility containers do not expose a value.
         repeat with element in windowContents
             try
-                log {role of element, name of element, value of element}
+                set elementProperties to get properties of element
+                log elementProperties
             end try
         end repeat
         keystroke "s" using command down

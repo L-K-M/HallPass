@@ -86,11 +86,15 @@ jobs:
       - name: Archive the app
         run: ditto -c -k --sequesterRsrc --keepParent dist/HallPass.app dist/HallPass-macos-universal.zip
 
+      - name: Test release-optimized behavior
+        if: always() && steps.preview.outcome == 'success'
+        run: swift test -c release
+
       - name: Check out the original interface for diagnosis
         if: failure() && steps.keyboard.outcome == 'failure'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 831065a
+          ref: 831065aa50626e5633bd87a150c18e90db3ab81b
           path: .build/reference-app
           persist-credentials: false
 
