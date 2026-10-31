@@ -1,382 +1,460 @@
+import AppKit
 import SwiftUI
 import HallPassCore
 
-enum Palette {
-    static let green = Color(nsColor: NSColor(name: "HallPassAccent") { appearance in
-        if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
-            return NSColor(calibratedRed: 0.43, green: 0.76, blue: 0.64, alpha: 1)
-        }
-        return NSColor(calibratedRed: 0.13, green: 0.43, blue: 0.35, alpha: 1)
-    })
-    static let surface = Color(nsColor: .controlBackgroundColor)
-    static let background = Color(nsColor: .windowBackgroundColor)
-}
+struct NetworkRow: Identifiable {
+    enum Status: String {
+        case saved = "Gespeichert"
+        case added = "Hinzugefügt"
+        case invalid = "Ungültiger Wert"
 
-struct InfoButton: View {
-    let title: String
-    let documentation: String
-    var appleLink = false
-    @State private var isOpen = false
-
-    var body: some View {
-        Button { isOpen.toggle() } label: {
-            Image(systemName: "info.circle").font(.system(size: 14)).foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .help(title)
-        .accessibilityLabel("Informationen: \(title)")
-        .popover(isPresented: $isOpen, arrowEdge: .bottom) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(title).font(.system(size: 13, weight: .semibold))
-                Text(documentation).font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
-                if appleLink {
-                    Link("Apple-Dokumentation ↗", destination: URL(string: "https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy")!)
-                        .font(.system(size: 11))
-                }
-            }
-            .padding(18).frame(width: 295).tint(Palette.green)
-        }
-    }
-}
-
-struct TicketMark: View {
-    var size: CGFloat = 36
-    var body: some View {
-        Group {
-            if let url = Bundle.main.url(forResource: "HallPass", withExtension: "icns"),
-               let icon = NSImage(contentsOf: url) {
-                Image(nsImage: icon).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
-            } else {
-                Image(systemName: "ticket.fill").font(.system(size: size * 0.7)).foregroundStyle(Palette.green)
+        var symbol: String {
+            switch self {
+            case .saved: "checkmark"
+            case .added: "plus.circle"
+            case .invalid: "exclamationmark.triangle"
             }
         }
-        .frame(width: size, height: size).accessibilityHidden(true)
     }
+
+    let id: Int
+    let notation: String
+    let status: Status
+    var cidr: CIDR? { try? CIDR(notation) }
+    var version: String { cidr.map { $0.isIPv6 ? "IPv6" : "IPv4" } ?? "–" }
 }
 
 struct ContentView: View {
+    private static let minimumDetailWidth: CGFloat = 430
+
     @Bindable var model: HallPassModel
-    @State private var showingAdd = false
-    @State private var showingReview = false
-    @State private var confirmingReset = false
-    @State private var confirmingReload = false
-    @State private var confirmingImport = false
-    @State private var confirmingLeaveDemo = false
+    @Environment(\.undoManager) private var windowUndoManager
+    @SceneStorage("selectedInterface") private var interfaceName = NetworkInterface.wifi.rawValue
+    @SceneStorage("showsInspector") private var showsInspector = false
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
+    @State private var selection = Set<Int>()
+    @State private var searchText = ""
+    @State private var sheet: WorkspaceSheet?
+    @State private var confirmation: DraftConfirmation?
+    @State private var showingFilePanel = false
+    @State private var window: NSWindow?
+    @FocusState private var searchFocused: Bool
+
+    private var interface: NetworkInterface { NetworkInterface(rawValue: interfaceName) ?? .wifi }
+    private var available: Bool { !model.busy && sheet == nil && confirmation == nil && !showingFilePanel }
+
+    private var rows: [NetworkRow] {
+        var saved = (model.snapshot?.configuration[interface] ?? [])
+            .reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+        return (model.draft[interface] ?? []).enumerated().map { index, notation in
+            let wasSaved = saved[notation, default: 0] > 0
+            saved[notation, default: 0] -= 1
+            let status: NetworkRow.Status = (try? CIDR(notation)) == nil ? .invalid : (wasSaved ? .saved : .added)
+            return NetworkRow(id: index, notation: notation, status: status)
+        }
+    }
+
+    private var visibleRows: [NetworkRow] {
+        guard !searchText.isEmpty else { return rows }
+        return rows.filter { $0.notation.localizedStandardContains(searchText) || $0.version.localizedStandardContains(searchText) }
+    }
+
+    private var selectedRows: [NetworkRow] { visibleRows.filter { selection.contains($0.id) } }
+
+    private var windowContents: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            sidebar
+                .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 280)
+        } detail: {
+            detail
+                .navigationSplitViewColumnWidth(min: Self.minimumDetailWidth, ideal: 520)
+                .navigationTitle("HallPass")
+                .navigationSubtitle(interface.title)
+                .toolbar { toolbar }
+        }
+        .navigationSplitViewStyle(.balanced)
+        .inspector(isPresented: $showsInspector) {
+            NetworkInspector(rows: selectedRows, interface: interface, canEdit: model.canEdit && available) {
+                perform(.edit)
+            }
+            .inspectorColumnWidth(min: NetworkInspector.minimumWidth, ideal: NetworkInspector.idealWidth, max: NetworkInspector.maximumWidth)
+        }
+        .focusedSceneValue(\.hallPassActions, WorkspaceActions(
+            model: model, available: available, selectionCount: selectedRows.count,
+            selectionIsActive: !searchFocused, showsInspector: showsInspector, interface: interface, perform: perform
+        ))
+    }
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-            Divider()
-            VStack(alignment: .leading, spacing: 18) {
-                header
-                if model.isLoaded { editor } else { welcome }
-                footer
+        windowContents
+        .background(WindowConnection(model: model) { window = $0 }.frame(width: 0, height: 0))
+        .task { model.restoreSession() }
+        .onChange(of: windowUndoManager, initial: true) { model.useUndoManager(windowUndoManager) }
+        .sheet(item: $sheet) { request in
+            switch request {
+            case .add:
+                NetworkEditor(model: model, interface: interface)
+            case .edit(let row):
+                NetworkEditor(model: model, interface: interface, entry: row)
+            case .review:
+                ReviewView(model: model)
+            case .help:
+                HelpView()
             }
-            .padding(.horizontal, 28).padding(.top, 43).padding(.bottom, 22)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(Palette.background).tint(Palette.green)
-        .background(WindowAccessor(model: model).frame(width: 0, height: 0))
-        .sheet(isPresented: $showingAdd) { AddNetworkView(model: model) }
-        .sheet(isPresented: $showingReview) { ReviewView(model: model) }
-        .alert("HallPass", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
-            Button("OK") { model.error = nil }
-        } message: { Text(model.error ?? "") }
-        .confirmationDialog("Alle Freigaben entfernen?", isPresented: $confirmingReset, titleVisibility: .visible) {
-            Button("Zum Entfernen vormerken", role: .destructive) { model.resetDraft() }
-        } message: { Text("Die Änderung wird erst mit Übernehmen gespeichert.") }
-        .confirmationDialog("Entwurf verwerfen und neu laden?", isPresented: $confirmingReload, titleVisibility: .visible) {
-            Button("Verwerfen und laden", role: .destructive) { Task { await model.load() } }
+        .alert("Vorgang nicht abgeschlossen", isPresented: Binding(
+            get: { model.error != nil }, set: { if !$0 { model.error = nil } }
+        )) {
+            Button("OK", role: .cancel) { model.error = nil }
+        } message: {
+            Text(model.error ?? "")
         }
-        .confirmationDialog("Entwurf durch Backup ersetzen?", isPresented: $confirmingImport, titleVisibility: .visible) {
-            Button("Backup auswählen") { model.importBackup() }
+        .alert(confirmation?.title ?? "", isPresented: Binding(
+            get: { confirmation != nil }, set: { if !$0 { confirmation = nil } }
+        ), presenting: confirmation) { pending in
+            Button(pending.actionTitle, role: .destructive) { confirm(pending) }
+            Button("Abbrechen", role: .cancel) { }
+        } message: { pending in
+            Text(pending.message)
         }
-        .confirmationDialog("Vorschau beenden und Entwurf verwerfen?", isPresented: $confirmingLeaveDemo, titleVisibility: .visible) {
-            Button("Vorschau beenden", role: .destructive) { model.leaveDemo() }
-        }
+        .onChange(of: model.draft) { selection.removeAll() }
+        .onChange(of: interfaceName) { selection.removeAll() }
+        .onChange(of: searchText) { selection.formIntersection(Set(visibleRows.map(\.id))) }
     }
 
     private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 9) {
-                TicketMark(size: 32)
-                Text("HallPass").font(.system(size: 20, weight: .semibold, design: .rounded)).tracking(-0.6)
-            }.padding(.top, 43).padding(.bottom, 32)
-            ForEach(NetworkInterface.allCases) { interface in
-                Button { model.selectedInterface = interface } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: interface.symbol).font(.system(size: 15)).frame(width: 19)
-                        Text(interface.title).font(.system(size: 12, weight: .medium))
-                        Spacer()
-                        Text(model.isLoaded ? "\((model.draft[interface] ?? []).count)" : "–")
-                            .font(.system(size: 10, weight: .semibold, design: .monospaced)).foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 11).padding(.vertical, 11)
-                    .background(model.selectedInterface == interface ? Palette.green.opacity(0.10) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
-                    .contentShape(Rectangle())
+        List(selection: Binding<NetworkInterface?>(
+            get: { interface }, set: { if let value = $0 { interfaceName = value.rawValue } }
+        )) {
+            Section("Verbindungen") {
+                ForEach(NetworkInterface.allCases) { connection in
+                    Label(connection.title, systemImage: connection.symbol)
+                        .badge(model.isLoaded ? Text("\((model.draft[connection] ?? []).count)") : Text(""))
+                        .tag(connection)
                 }
-                .buttonStyle(.plain).padding(.bottom, 5)
-                .accessibilityLabel("\(interface.title), \((model.draft[interface] ?? []).count) Freigaben")
             }
-            Spacer()
-            Menu {
-                Button("Gespeicherten Zustand exportieren…", action: model.exportBackup)
-                Button("Backup importieren…") {
-                    if model.isDirty { confirmingImport = true } else { model.importBackup() }
-                }
-                Divider()
-                Button("Backupordner öffnen", action: model.showBackups).disabled(model.isDemo)
-                Divider()
-                Button("Alle Freigaben entfernen…", role: .destructive) { confirmingReset = true }
-            } label: { Label("Backups", systemImage: "clock.arrow.circlepath").font(.system(size: 11)) }
-                .menuStyle(.borderlessButton).disabled(!model.isLoaded || model.busy)
         }
-        .padding(.horizontal, 16).padding(.bottom, 24)
-        .frame(width: 180).frame(maxHeight: .infinity)
-        .background(Palette.green.opacity(0.025))
+        .listStyle(.sidebar)
+        .disabled(!available)
+        .accessibilityLabel("Netzwerkverbindung")
     }
 
-    private var header: some View {
-        HStack(spacing: 10) {
-            Text("Netzfreigaben").font(.system(size: 23, weight: .semibold)).tracking(-0.6)
-            InfoButton(title: "Netzfreigaben", documentation: "Die eingetragenen IP-Bereiche sind für alle Apps auf diesem Mac erreichbar, unabhängig von deren lokaler Netzwerkberechtigung. Die Ausnahmen gelten in jedem Netz mit diesen Adressen. WLAN und Ethernet werden getrennt verwaltet.", appleLink: true)
-            Spacer(minLength: 6)
-            if model.isDemo {
-                HStack(spacing: 6) {
-                    Text("Vorschau").font(.system(size: 10, weight: .medium)).foregroundStyle(Palette.green)
-                    InfoButton(title: "Vorschau", documentation: "Du arbeitest mit Beispielwerten. Änderungen bleiben im Arbeitsspeicher; die Systemeinstellungen werden weder gelesen noch verändert.")
-                    Button {
-                        if model.isDirty { confirmingLeaveDemo = true } else { model.leaveDemo() }
-                    } label: { Image(systemName: "xmark").font(.system(size: 9, weight: .semibold)) }
-                    .buttonStyle(.plain).help("Vorschau beenden").accessibilityLabel("Vorschau beenden")
+    private var detail: some View {
+        VStack(spacing: 0) {
+            notices
+            Group {
+                if model.isLoaded {
+                    networkTable
+                } else {
+                    welcome
                 }
-            } else if model.needsRestart {
-                HStack(spacing: 6) {
-                    Label("Neustart nötig", systemImage: "arrow.clockwise").font(.system(size: 10)).foregroundStyle(.orange)
-                    InfoButton(title: "Neustart erforderlich", documentation: "Die Änderungen sind gespeichert. macOS übernimmt sie erst nach einem Neustart. HallPass startet deinen Mac nicht automatisch neu.")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            statusBar
+        }
+        // Bound wrapping before the split view measures its minimum size.
+        .frame(minWidth: Self.minimumDetailWidth, maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var networkTable: some View {
+        Table(visibleRows, selection: $selection) {
+            TableColumn("IP-Bereich") { row in
+                Text(row.notation).monospaced()
+            }
+            .width(min: 190, ideal: 250)
+            TableColumn("Version", value: \.version).width(65)
+            TableColumn("Status") { row in
+                Label(row.status.rawValue, systemImage: row.status.symbol)
+                    .foregroundStyle(row.status == .invalid ? Color.orange : Color.secondary)
+                    .accessibilityLabel(row.status.rawValue)
+            }
+            .width(min: 110, ideal: 125)
+        }
+        .disabled(model.busy)
+        .searchable(text: $searchText, placement: .toolbar, prompt: "IP-Bereiche suchen")
+        .searchFocused($searchFocused)
+        .onDeleteCommand {
+            guard model.canEdit, available, !searchFocused else { return }
+            model.remove(selection, interface: interface)
+        }
+        .onCopyCommand(perform: selectedRows.isEmpty ? nil : {
+            [NSItemProvider(object: selectedRows.map(\.notation).joined(separator: "\n") as NSString)]
+        })
+        .onKeyPress(.return) {
+            guard available, model.canEdit, !searchFocused, selectedRows.count == 1 else { return .ignored }
+            perform(.edit)
+            return .handled
+        }
+        .contextMenu(forSelectionType: Int.self) { items in
+            Button("IP-Bereich bearbeiten…") { edit(items) }
+                .disabled(items.count != 1 || !model.canEdit)
+            Button("Kopieren") { copy(items) }.disabled(items.isEmpty)
+            Divider()
+            Button("Entfernen", role: .destructive) { model.remove(items, interface: interface) }
+                .disabled(items.isEmpty || !model.canEdit)
+        } primaryAction: { items in
+            edit(items)
+        }
+        .overlay {
+            if visibleRows.isEmpty {
+                ContentUnavailableView {
+                    Label(searchText.isEmpty ? "Keine Freigaben" : "Keine Treffer", systemImage: searchText.isEmpty ? interface.symbol : "magnifyingglass")
+                } description: {
+                    Text(searchText.isEmpty
+                         ? "Für \(interface.title) gelten die regulären lokalen Netzwerkberechtigungen."
+                         : "Kein IP-Bereich entspricht „\(searchText)“.")
+                } actions: {
+                    if searchText.isEmpty {
+                        Button("Netzbereich hinzufügen…") { perform(.add) }.disabled(!model.canEdit)
+                    } else {
+                        Button("Suche löschen") { searchText = "" }
+                    }
                 }
             }
         }
+        .accessibilityLabel("IP-Bereiche für \(interface.title)")
     }
 
     private var welcome: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "lock.rectangle.on.rectangle").font(.system(size: 32, weight: .light)).foregroundStyle(Palette.green)
-            HStack(spacing: 9) {
-                Button { Task { await model.load() } } label: {
-                    Text(model.busy ? "Wird geladen …" : "Konfiguration laden").padding(.horizontal, 7).padding(.vertical, 4)
+        ContentUnavailableView {
+            Label {
+                Text("Lokale Netzfreigaben")
+            } icon: {
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable().scaledToFit().frame(width: 72, height: 72)
+            }
+        } description: {
+            Text("Verwalte IP-Bereiche, die alle Apps auf diesem Mac ohne lokale Netzwerkabfrage erreichen dürfen. Zum Laden sind Administratorrechte nötig.")
+                .frame(maxWidth: 390)
+        } actions: {
+            Button("Konfiguration laden…") { perform(.load) }
+                .buttonStyle(.borderedProminent).disabled(!available)
+            Button("Mit Beispieldaten ausprobieren") { perform(.preview) }.disabled(!available)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItem {
+            Button(model.isLoaded ? "Konfiguration neu laden" : "Konfiguration laden", systemImage: "arrow.clockwise") {
+                perform(.load)
+            }
+            .help("Konfiguration laden (⌘L)")
+            .disabled(!available)
+        }
+        ToolbarSpacer(.fixed)
+        ToolbarItemGroup {
+            Button("Netzbereich hinzufügen", systemImage: "plus") { perform(.add) }
+                .help("Netzbereich hinzufügen (⌘N)").disabled(!available || !model.canEdit)
+            Button("Auswahl entfernen", systemImage: "minus") { model.remove(selection, interface: interface) }
+                .help("Ausgewählte IP-Bereiche entfernen").disabled(!available || !model.canEdit || selectedRows.isEmpty)
+        }
+        ToolbarSpacer(.fixed)
+        ToolbarItem(placement: .primaryAction) {
+            Button("Änderungen prüfen…") { perform(.review) }
+                .help("Änderungen vor dem Übernehmen prüfen (⌘S)")
+                .disabled(!available || !model.canReview)
+        }
+        ToolbarItem {
+            Button("Informationen", systemImage: "sidebar.right") { showsInspector.toggle() }
+                .help("Informationen ein- oder ausblenden (⌥⌘I)")
+                .disabled(!available || !model.isLoaded)
+                .accessibilityValue(showsInspector ? "Eingeblendet" : "Ausgeblendet")
+        }
+    }
+
+    private var notices: some View {
+        VStack(spacing: 0) {
+            if model.isDemo {
+                banner("Vorschau", symbol: "eye", text: "Beispieldaten. Die Systemeinstellungen bleiben unverändert.") {
+                    Button("Vorschau beenden") { perform(.preview) }.disabled(!available)
                 }
-                .buttonStyle(.borderedProminent).disabled(model.busy).keyboardShortcut("l", modifiers: .command)
-                InfoButton(title: "Konfiguration laden", documentation: "macOS fragt nach Administratorrechten, damit HallPass die systemweiten Einstellungen lesen kann. Beim Laden wird nichts verändert. Erst nach Änderungen prüfen und Übernehmen werden die angezeigten Ausnahmen gespeichert.")
+            } else if model.recoveryBlocked {
+                banner("Entwurfsdatei geschützt", symbol: "exclamationmark.triangle", text: "Prüfe die Zugriffsrechte im HallPass-Ordner und starte HallPass erneut, bevor du Änderungen vornimmst.") {
+                    EmptyView()
+                }
+            } else if model.requiresReload {
+                banner("Systemzustand prüfen", symbol: "exclamationmark.triangle", text: "Lade die Konfiguration neu. Der Entwurf und das automatische Backup bleiben bis dahin erhalten.") {
+                    Button("Neu laden…") { perform(.load) }.disabled(!available)
+                }
+            } else if model.recoveredDraft {
+                banner("Entwurf wiederhergestellt", symbol: "arrow.counterclockwise", text: "Noch nicht übernommen. Beim Speichern wird der Systemzustand erneut geprüft.") {
+                    EmptyView()
+                }
             }
-            Button("Vorschau") { model.startDemo() }.buttonStyle(.link).font(.system(size: 11)).disabled(model.busy)
+
+            if model.needsRestart, !model.isDemo {
+                banner("Neustart erforderlich", symbol: "restart", text: "Die gespeicherten Freigaben werden erst nach einem Neustart wirksam.") {
+                    EmptyView()
+                }
+            }
+
+            if model.isLoaded, model.validationMessage != nil {
+                banner("Ungültige IP-Bereiche", symbol: "exclamationmark.triangle", text: "Korrigiere oder entferne die markierten Werte vor dem Übernehmen.") {
+                    Button("Informationen") { showsInspector = true }
+                }
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity).padding(20)
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 13))
-        .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(.primary.opacity(0.06)))
     }
 
-    private var editor: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("IP-Bereiche").font(.system(size: 12, weight: .semibold))
-                Text("\(model.networks.count)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
-                Spacer()
-                Button { showingAdd = true } label: { Label("Hinzufügen", systemImage: "plus").font(.system(size: 11, weight: .medium)) }
-                    .buttonStyle(.bordered).disabled(model.busy).keyboardShortcut("n", modifiers: .command)
-            }.padding(16)
+    private func banner<Actions: View>(_ title: String, symbol: String, text: String, @ViewBuilder actions: () -> Actions) -> some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbol).foregroundStyle(.secondary).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.callout.bold())
+                    Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                actions().controlSize(.small)
+            }
+            .padding(12)
             Divider()
-            if model.networks.isEmpty {
-                VStack(spacing: 12) {
-                    HStack(spacing: 8) {
-                        Text("Keine Freigaben").font(.system(size: 13)).foregroundStyle(.secondary)
-                        InfoButton(title: "Keine Freigaben", documentation: "Für diese Verbindung sind keine Ausnahmen konfiguriert. Apps benötigen für lokale Netzwerkzugriffe ihre reguläre Berechtigung.")
-                    }
-                    Button("Hinzufügen") { showingAdd = true }.buttonStyle(.link).font(.system(size: 11))
-                }.frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(Array(model.networks.enumerated()), id: \.offset) { index, network in
-                            networkRow(network)
-                            if index < model.networks.count - 1 { Divider().padding(.leading, 16) }
-                        }
-                    }
-                }.frame(maxHeight: .infinity)
-            }
         }
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 13))
-        .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(.primary.opacity(0.07)))
-        .disabled(model.busy)
+        .background(.background)
     }
 
-    private func networkRow(_ network: String) -> some View {
-        let cidr = try? CIDR(network)
-        let isNew = !(model.snapshot?.configuration[model.selectedInterface] ?? []).contains(network)
-        return HStack(spacing: 12) {
-            Text(network).font(.system(size: 13, weight: .medium, design: .monospaced)).textSelection(.enabled)
-            Spacer()
-            if cidr == nil {
-                InfoButton(title: "Ungültiger Altwert", documentation: "Dieser vorhandene Wert ist keine gültige CIDR-Notation. Entferne ihn vor dem Speichern oder ersetze ihn durch einen gültigen IP-Bereich.")
-            } else {
-                Text(cidr!.isIPv6 ? "IPv6" : "IPv4").font(.system(size: 10)).foregroundStyle(.tertiary)
+    private var statusBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 8) {
+                if model.busy {
+                    ProgressView().controlSize(.small)
+                    Text(model.activity == .loading ? "Konfiguration wird geladen…" : "Änderungen werden übernommen…")
+                } else if let notice = model.notice {
+                    Text(notice)
+                } else if model.isLoaded {
+                    Text(searchText.isEmpty ? "\(rows.count) IP-Bereiche" : "\(visibleRows.count) von \(rows.count) IP-Bereichen")
+                    if !selection.isEmpty { Text("· \(selection.count) ausgewählt") }
+                } else {
+                    Text("Keine Konfiguration geladen")
+                }
+                Spacer(minLength: 8)
+                if model.isDirty { Label("Nicht übernommen", systemImage: "pencil") }
             }
-            if isNew { Circle().fill(Palette.green).frame(width: 5, height: 5).help("Neu im Entwurf") }
-            Button { model.remove(network) } label: {
-                Image(systemName: "minus.circle").font(.system(size: 14)).foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain).help("Entfernen").accessibilityLabel("\(network) entfernen")
-        }.padding(.horizontal, 16).padding(.vertical, 17)
+            .font(.callout).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.vertical, 10)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .background(.bar)
     }
 
-    private var footer: some View {
-        HStack(spacing: 12) {
-            if model.busy { ProgressView().controlSize(.small) }
-            Button {
-                if model.isDirty { confirmingReload = true } else { Task { await model.load() } }
-            } label: { Image(systemName: "arrow.clockwise") }
-            .help("Neu laden").accessibilityLabel("Neu laden").disabled(model.busy || !model.isLoaded)
-            if model.isDirty {
-                Button("Verwerfen", action: model.discard).buttonStyle(.plain).font(.system(size: 11)).disabled(model.busy)
+    private func perform(_ command: WorkspaceCommand) {
+        guard available else { return }
+        switch command {
+        case .add:
+            guard model.canEdit else { return }
+            sheet = .add
+        case .edit:
+            edit(selection)
+        case .remove:
+            guard !searchFocused else { return }
+            model.remove(selection, interface: interface)
+        case .review:
+            guard model.canReview else { return }
+            sheet = .review
+        case .load:
+            if model.isDirty { confirmation = .reload } else { Task { await model.load() } }
+        case .discard:
+            confirmation = .discard
+        case .reset:
+            confirmation = .reset
+        case .preview:
+            guard model.isDemo else { model.startDemo(); return }
+            if model.isDirty { confirmation = .leavePreview } else { model.leaveDemo() }
+        case .importBackup:
+            guard model.canEdit, let window else { return }
+            showingFilePanel = true
+            BackupPanels.open(in: window) { url in
+                showingFilePanel = false
+                if let url { model.importBackup(from: url) }
             }
-            Spacer()
-            if let message = model.validationMessage, model.isLoaded {
-                InfoButton(title: "Entwurf prüfen", documentation: message)
-            } else if model.isDirty {
-                Text("Ungespeichert").font(.system(size: 10)).foregroundStyle(.secondary)
-            } else if let notice = model.notice {
-                Text(notice).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+        case .exportBackup:
+            guard model.isLoaded, let window else { return }
+            showingFilePanel = true
+            BackupPanels.save(in: window) { url in
+                showingFilePanel = false
+                if let url { model.exportBackup(to: url) }
             }
-            Button { showingReview = true } label: {
-                Text("Änderungen prüfen").font(.system(size: 12, weight: .medium)).padding(.horizontal, 5).padding(.vertical, 3)
-            }
-            .buttonStyle(.borderedProminent).disabled(!model.isDirty || model.busy || model.validationMessage != nil)
-            .keyboardShortcut("s", modifiers: .command)
+        case .backups:
+            model.showBackups()
+        case .inspector:
+            showsInspector.toggle()
+        case .search:
+            searchFocused = true
+        case .wifi:
+            interfaceName = NetworkInterface.wifi.rawValue
+        case .ethernet:
+            interfaceName = NetworkInterface.ethernet.rawValue
+        case .help:
+            sheet = .help
+        }
+    }
+
+    private func edit(_ items: Set<Int>) {
+        guard available, model.canEdit, items.count == 1,
+              let row = rows.first(where: { items.contains($0.id) }) else { return }
+        selection = items
+        sheet = .edit(row)
+    }
+
+    private func copy(_ items: Set<Int>) {
+        let text = rows.filter { items.contains($0.id) }.map(\.notation).joined(separator: "\n")
+        guard !text.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    private func confirm(_ pending: DraftConfirmation) {
+        confirmation = nil
+        switch pending {
+        case .reload: Task { await model.load() }
+        case .discard: model.discard()
+        case .reset: model.resetDraft()
+        case .leavePreview: model.leaveDemo()
         }
     }
 }
 
-struct AddNetworkView: View {
-    @Bindable var model: HallPassModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var input = ""
-    @State private var both = true
-    @State private var failure: String?
-    @FocusState private var focused: Bool
-    private var parsed: CIDR? { try? CIDR(input) }
+private enum WorkspaceSheet: Identifiable {
+    case add, edit(NetworkRow), review, help
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                Text("Netzbereich hinzufügen").font(.system(size: 19, weight: .semibold)).tracking(-0.5)
-                Spacer()
-                InfoButton(title: "Netzbereich hinzufügen", documentation: "Die Ausnahme gilt für alle Apps. Einträge werden zunächst zum Entwurf hinzugefügt. Erst Übernehmen speichert sie in macOS.")
-            }
-            VStack(alignment: .leading, spacing: 9) {
-                HStack(spacing: 7) {
-                    Text("IP-Bereich").font(.system(size: 12, weight: .medium))
-                    InfoButton(title: "CIDR-Notation", documentation: "Gib eine IPv4- oder IPv6-Adresse mit Netzpräfix ein, zum Beispiel 192.168.1.0/24 oder fd12:3456::/48. Für eine einzelne Adresse: /32 bei IPv4, /128 bei IPv6. Host-Bits werden automatisch zur Netzadresse normalisiert.")
-                }
-                TextField("192.168.1.0/24", text: $input).textFieldStyle(.roundedBorder)
-                    .font(.system(size: 14, design: .monospaced)).controlSize(.large).focused($focused).onSubmit(add)
-                if let parsed, parsed.notation != input.trimmingCharacters(in: .whitespacesAndNewlines) {
-                    HStack(spacing: 7) {
-                        Text("→ \(parsed.notation)").font(.system(size: 11, design: .monospaced)).foregroundStyle(Palette.green)
-                        InfoButton(title: "Netzadresse", documentation: "Die Adresse wurde auf den Anfang des angegebenen Netzes normalisiert. Gespeichert wird dieser gesamte IP-Bereich.")
-                    }
-                } else if !input.isEmpty && parsed == nil {
-                    HStack(spacing: 7) {
-                        Text("Ungültiger IP-Bereich").font(.system(size: 11)).foregroundStyle(.orange)
-                        InfoButton(title: "IP-Bereich korrigieren", documentation: "Erforderlich sind eine numerische IP-Adresse und ein Präfix: IPv4 /0 bis /32, IPv6 /0 bis /128. Hostnamen, Zonen-IDs und Leerzeichen innerhalb der Adresse sind nicht möglich.")
-                    }
-                }
-            }
-            HStack(spacing: 7) {
-                preset("Link-Local", "169.254.0.0/16")
-                preset("Privates /24", "192.168.1.0/24")
-                preset("IPv6 Link-Local", "fe80::/10")
-                InfoButton(title: "Vorlagen", documentation: "Link-Local: 169.254.0.0/16. Privates /24: 192.168.1.0/24 als Beispiel – passe es an dein Netz an. IPv6 Link-Local: fe80::/10. Ein Klick füllt nur das Eingabefeld aus.")
-            }
-            Toggle("WLAN und Ethernet", isOn: $both).font(.system(size: 12))
-            if !both { Text("Nur \(model.selectedInterface.title)").font(.system(size: 11)).foregroundStyle(.secondary) }
-            if parsed?.prefixLength == 0 {
-                HStack(spacing: 7) {
-                    Label("Alle IPv\(parsed!.isIPv6 ? "6" : "4")-Adressen", systemImage: "exclamationmark.triangle").font(.system(size: 11)).foregroundStyle(.orange)
-                    InfoButton(title: "Ausnahme für /0", documentation: "Dieser Bereich umfasst alle Adressen der gewählten IP-Version. Damit entfallen die lokalen Netzwerkprüfungen für diesen gesamten Adressraum.")
-                }
-            }
-            if let failure { Text(failure).font(.system(size: 11)).foregroundStyle(.orange) }
-            Divider()
-            HStack {
-                Spacer()
-                Button("Abbrechen") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Hinzufügen", action: add).buttonStyle(.borderedProminent).disabled(parsed == nil).keyboardShortcut(.defaultAction)
-            }
-        }.padding(25).frame(width: 455).tint(Palette.green).onAppear { focused = true }
-    }
-
-    private func preset(_ title: String, _ value: String) -> some View {
-        Button(title) { input = value }.font(.system(size: 10)).buttonStyle(.bordered)
-    }
-    private func add() {
-        guard parsed != nil else { return }
-        do {
-            try model.add(input, interfaces: both ? NetworkInterface.allCases : [model.selectedInterface])
-            dismiss()
-        } catch { failure = error.localizedDescription }
+    var id: String {
+        switch self {
+        case .add: "add"
+        case .edit(let row): "edit-\(row.id)"
+        case .review: "review"
+        case .help: "help"
+        }
     }
 }
 
-struct ReviewView: View {
-    @Bindable var model: HallPassModel
-    @Environment(\.dismiss) private var dismiss
+private enum DraftConfirmation {
+    case reload, discard, reset, leavePreview
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Text("Änderungen übernehmen?").font(.system(size: 20, weight: .semibold)).tracking(-0.5)
-                Spacer()
-                InfoButton(title: "Änderungen übernehmen", documentation: model.isDemo ? "Vorschau: Die Systemeinstellungen werden nicht verändert." : "Die Ausnahmen gelten für alle Apps. HallPass erstellt vor dem Speichern ein Backup und macOS fragt nach Administratorrechten. Die Änderungen werden nach einem Neustart wirksam.")
-            }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    ForEach(NetworkInterface.allCases) { interface in
-                        let before = model.snapshot?.configuration[interface] ?? []
-                        let after = model.draft[interface] ?? []
-                        let added = after.filter { !before.contains($0) }
-                        let removed = before.filter { !after.contains($0) }
-                        if model.snapshot?.configuration[interface] != model.draft[interface] {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Label(interface.title, systemImage: interface.symbol).font(.system(size: 12, weight: .semibold))
-                                ForEach(added, id: \.self) { row($0, added: true) }
-                                ForEach(removed, id: \.self) { row($0, added: false) }
-                                if added.isEmpty && removed.isEmpty {
-                                    Label("Leere Einstellung zurücksetzen", systemImage: "minus.circle").font(.system(size: 11)).foregroundStyle(.secondary)
-                                }
-                            }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Palette.surface, in: RoundedRectangle(cornerRadius: 10))
-                        }
-                    }
-                }
-            }.frame(maxHeight: 260)
-            Divider()
-            HStack {
-                Button("Zurück") { dismiss() }.keyboardShortcut(.cancelAction)
-                Spacer()
-                Button(model.isDemo ? "Vorschau übernehmen" : "Übernehmen") {
-                    dismiss()
-                    Task { await model.save() }
-                }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
-            }
-        }.padding(25).frame(width: 455).tint(Palette.green)
+    var title: String {
+        switch self {
+        case .reload: "Entwurf verwerfen und neu laden?"
+        case .discard: "Änderungen verwerfen?"
+        case .reset: "Alle Freigaben entfernen?"
+        case .leavePreview: "Vorschau beenden?"
+        }
     }
 
-    private func row(_ network: String, added: Bool) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: added ? "plus.circle.fill" : "minus.circle.fill").foregroundStyle(added ? Palette.green : Color.orange)
-            Text(network).font(.system(size: 12, design: .monospaced))
-            Spacer()
-        }.accessibilityLabel("\(added ? "Hinzufügen" : "Entfernen"): \(network)")
+    var message: String {
+        switch self {
+        case .reload: "Die nicht übernommenen Änderungen werden durch den Systemzustand ersetzt."
+        case .discard: "Der Entwurf wird auf den zuletzt geladenen oder gespeicherten Zustand zurückgesetzt. Du kannst dies widerrufen."
+        case .reset: "Die Freigaben für WLAN und Ethernet werden im Entwurf entfernt. Erst Übernehmen und ein Neustart ändern die wirksamen Einstellungen."
+        case .leavePreview: "Die nicht übernommenen Änderungen an den Beispieldaten werden verworfen."
+        }
+    }
+
+    var actionTitle: String {
+        switch self {
+        case .reload: "Verwerfen und laden"
+        case .discard: "Änderungen verwerfen"
+        case .reset: "Zum Entfernen vormerken"
+        case .leavePreview: "Vorschau beenden"
+        }
     }
 }

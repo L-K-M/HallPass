@@ -11,6 +11,17 @@
 # directories.
 set -euo pipefail
 
+MINIMUM_SDK_MAJOR=26
+if [[ "$(uname -s)" != "Darwin" ]]; then
+    printf 'HallPass requires macOS %s and Xcode %s or later.\n' "$MINIMUM_SDK_MAJOR" "$MINIMUM_SDK_MAJOR" >&2
+    exit 1
+fi
+SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
+if (( ${SDK_VERSION%%.*} < MINIMUM_SDK_MAJOR )); then
+    printf 'Select Xcode %s or later with xcode-select before building HallPass.\n' "$MINIMUM_SDK_MAJOR" >&2
+    exit 1
+fi
+
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="${HALLPASS_BUILD_DIR:-$PROJECT_ROOT/.build}"
 OUTPUT_DIR="${HALLPASS_OUTPUT_DIR:-$PROJECT_ROOT/dist}"

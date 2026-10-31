@@ -4,19 +4,14 @@ on:
   pull_request:
   push:
     branches: [main]
-  # Manual runs. Added because GitHub throttled webhook delivery during an Actions
-  # incident and pull_request events stopped starting workflows at all — dispatch
-  # goes through the API instead and is unaffected. Useful beyond the outage too:
-  # re-running CI no longer needs an empty commit.
+  # Dispatch remains available when webhook delivery is delayed.
   workflow_dispatch:
 
-# Least privilege: the build/test job only needs to read the repo.
+# The build/test job only needs to read the repository.
 permissions:
   contents: read
 
-# Cancel an in-progress run when a *PR branch* is pushed again — but never cancel a
-# push to main, or that commit is left with a permanently "cancelled" status (masking
-# breakage and putting holes in CI-status bisection).
+# Cancel superseded PR runs, while retaining complete main-branch results.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -25,17 +20,12 @@ jobs:
   build-test:
     name: Build, Test & Package
     runs-on: macos-26
-    timeout-minutes: 30   # a wedged build shouldn't burn the 6h default job limit
+    timeout-minutes: 30
     steps:
-      # Actions are pinned to immutable commit SHAs: a mutable tag like @v4 can be
-      # repointed at tampered code after the fact, a commit SHA cannot. Same
-      # pin-and-verify discipline zai-code-review.yml already uses.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: false   # nothing here runs git after checkout
+          persist-credentials: false
 
-      # License statements must agree with LICENSE (the Unlicense), and the bundle
-      # identity with the fleet's ch.lkmc.* namespace — before paying for a build.
       - name: Check license statements and bundle identity
         run: |
           grep -q '^## License$' README.md || { echo "::error::README.md lacks its '## License' section"; exit 1; }
@@ -47,16 +37,15 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: '26.0'   # pin so a runner-image bump can't change the toolchain
+          xcode-version: '26.0'
 
       - name: Build
-        run: swift build
+        run: swift build -Xswiftc -warnings-as-errors
 
       - name: Test
         run: swift test
 
-      # Same invocation release.yml uses, so the release path is exercised on
-      # every change rather than first failing under a tag.
+      # Keep the release packaging invocation covered on every change.
       - name: Assemble HallPass.app (universal)
         run: ./scripts/build-app.sh --universal
 
@@ -71,5 +60,104 @@ jobs:
             || { echo "::error::built app lost its bundle identifier"; exit 1; }
           test -f "$APP/Contents/Resources/HallPass.icns" \
             || { echo "::error::built app lacks its icon"; exit 1; }
-          codesign --verify --deep --strict "$APP" \
-            || { echo "::error::ad-hoc signature failed verification — the app would not launch"; exit 1; }
+          codesign --verify --deep --strict "$APP"
+
+      - name: Launch the actual app with sample data
+        id: preview
+        run: |
+          open --stdout "$PWD/dist/HallPass-preview.log" --stderr "$PWD/dist/HallPass-preview.log" dist/HallPass.app --args --demo
+          sleep 20
+          pgrep -x HallPass
+
+      - name: Exercise the preview keyboard workflow
+        id: keyboard
+        timeout-minutes: 5
+        run: osascript scripts/check-preview.applescript
+
+      - name: Capture the running preview
+        if: always() && steps.preview.outcome == 'success'
+        run: |
+          PREVIEW_PID="$(pgrep -x HallPass)"
+          trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
+          screencapture -x dist/HallPass-preview.png
+          WINDOW_NUMBER="$(swift scripts/window-number.swift "$PREVIEW_PID")"
+          screencapture -x -o -l "$WINDOW_NUMBER" dist/HallPass-window.png
+          if test '${{ steps.keyboard.outcome }}' = success; then
+            osascript -e 'tell application "HallPass" to quit'
+          else
+            pkill -x HallPass
+          fi
+
+      - name: Archive the app
+        run: ditto -c -k --sequesterRsrc --keepParent dist/HallPass.app dist/HallPass-macos-universal.zip
+
+      - name: Test release-optimized behavior
+        if: always() && steps.preview.outcome == 'success'
+        run: swift test -c release
+
+      - name: Check the documented host-architecture build
+        id: host
+        if: always() && steps.preview.outcome == 'success'
+        run: |
+          HALLPASS_OUTPUT_DIR="$PWD/dist/host" ./scripts/build-app.sh
+          open --stdout "$PWD/dist/HallPass-host.log" --stderr "$PWD/dist/HallPass-host.log" dist/host/HallPass.app --args --demo
+          HOST_PID="$(pgrep -x HallPass)"
+          ORIGINAL_DARK_MODE="$(osascript -e 'tell application "System Events" to get dark mode of appearance preferences')"
+          cleanup() {
+            osascript -e "tell application \"System Events\" to set dark mode of appearance preferences to $ORIGINAL_DARK_MODE"
+            kill "$HOST_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          sleep 10
+          WINDOW_NUMBER="$(swift scripts/window-number.swift "$HOST_PID")"
+          screencapture -x -o -l "$WINDOW_NUMBER" dist/HallPass-host.png
+          osascript -e 'tell application "System Events" to set dark mode of appearance preferences to true'
+          sleep 2
+          screencapture -x -o -l "$WINDOW_NUMBER" dist/HallPass-dark.png
+
+      - name: Restore a private fixture in the running app
+        if: always() && steps.host.outcome == 'success'
+        run: |
+          RECOVERY_DIGEST="$(python3 - <<'PY'
+          import hashlib, json, os, plistlib
+          from pathlib import Path
+          directory = Path.home() / "Library/Application Support/HallPass"
+          directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+          path = directory / "Draft.json"
+          baseline = plistlib.dumps({"AllowedWiFiLocalNetworkAddresses": []}).decode()
+          data = json.dumps({"formatVersion": 1, "baselineXML": baseline,
+                             "draft": {"wifi": ["legacy-invalid-value"], "ethernet": []}}).encode()
+          with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as file:
+              file.write(data)
+          print(hashlib.sha256(data).hexdigest())
+          PY
+          )"
+          open --stdout "$PWD/dist/HallPass-recovery.log" --stderr "$PWD/dist/HallPass-recovery.log" dist/HallPass.app
+          RECOVERY_PID="$(pgrep -x HallPass)"
+          trap 'kill "$RECOVERY_PID" 2>/dev/null || true' EXIT
+          osascript scripts/check-recovery.applescript
+          WINDOW_NUMBER="$(swift scripts/window-number.swift "$RECOVERY_PID")"
+          screencapture -x -o -l "$WINDOW_NUMBER" dist/HallPass-recovery.png
+          kill "$RECOVERY_PID"
+          python3 - "$RECOVERY_DIGEST" <<'PY'
+          import hashlib, sys
+          from pathlib import Path
+          path = Path.home() / "Library/Application Support/HallPass/Draft.json"
+          assert hashlib.sha256(path.read_bytes()).hexdigest() == sys.argv[1], "Recovery changed the original bytes"
+          path.unlink()
+          PY
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: HallPass-macos-universal
+          path: |
+            dist/HallPass-macos-universal.zip
+            dist/HallPass-preview.png
+            dist/HallPass-window.png
+            dist/HallPass-preview.log
+            dist/HallPass-host.png
+            dist/HallPass-host.log
+            dist/HallPass-dark.png
+            dist/HallPass-recovery.png
+            dist/HallPass-recovery.log

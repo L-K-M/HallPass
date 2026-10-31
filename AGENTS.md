@@ -6,8 +6,8 @@ Guidance for AI coding agents working in the **HallPass** repository.
 
 HallPass is a SwiftUI macOS app that manages **system-wide** CIDR exemptions from
 the macOS local-network privacy restriction (Apple TN3179). The exemptions it
-edits apply to *all apps on the Mac*, not to HallPass itself. Requires macOS 15.5.
-The interface is in German; each control has an ⓘ popover with its documentation.
+edits apply to *all apps on the Mac*, not to HallPass itself. Requires macOS 26.
+The interface is in German; Help and the selection inspector explain its scope.
 
 ## Tech Stack
 
@@ -15,23 +15,34 @@ The interface is in German; each control has an ⓘ popover with its documentati
   Foundation, SwiftUI and AppKit only.
 - **Layout:** `Package.swift` at the root (two modules, no `.xcodeproj`):
   - `Sources/HallPassCore/` — pure logic: `CIDR`, `Configuration`,
-    `PreferencePlan`. Everything testable lives here.
+    `PreferencePlan`, configuration editing and draft recovery formats.
   - `Sources/HallPass/` — the app: SwiftUI views, `HallPassModel`,
-    `SystemPreferencesService` (the privileged boundary).
+    `BackupStore`, `SystemPreferencesService` (the privileged boundary).
 - **System access:** `/usr/bin/osascript` + `/usr/bin/defaults` under
   administrator privileges. Reads and writes exactly two keys in the fixed
   domain `com.apple.network.local-network`
   (`AllowedWiFiLocalNetworkAddresses`, `AllowedEthernetLocalNetworkAddresses`).
 - **Backups:** before each real save, the loaded state is written to
   `~/Library/Application Support/HallPass/Backups/`.
+- **Recovery:** real drafts and their original baselines are atomically saved to
+  `~/Library/Application Support/HallPass/Draft.json`; preview never writes it.
+  Failed recovery originals are moved unchanged into Backups. If that fails,
+  real editing is blocked so the original cannot be overwritten.
+- **Window:** one machine-wide draft; native sidebar, table, inspector and
+  toolbar. Closing the window keeps the app running. Draft undo is separate
+  from committed system state and clears on successful loading/applying.
 
 ## Build & Test
 
 ```sh
 swift build            # package
-swift test             # HallPassCoreTests (no admin prompts, temp plist domains)
+swift test             # Core + AppKit model tests; temp plist domains, no admin prompts
 ./scripts/build-app.sh # dist/HallPass.app, ad-hoc signed (--debug, --universal)
 ```
+
+Use Xcode 26 or later. `HallPassCoreTests` also runs on Linux; the app, model
+tests and `defaults` integration tests require macOS. CI launches preview and
+retains an actual screenshot alongside the universal app archive.
 
 `scripts/build.sh` / `scripts/release.sh` are thin stubs over the shared
 `lkm-build` / `lkm-release` engines (the `release-tool` repo); the build engine

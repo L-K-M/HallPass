@@ -11,6 +11,8 @@ public enum NetworkInterface: String, CaseIterable, Codable, Sendable, Identifia
 }
 
 public struct NetworkConfiguration: Codable, Equatable, Sendable {
+    public static let maximumNetworksPerInterface = 512
+
     public var wifi: [String]?
     public var ethernet: [String]?
 
@@ -37,7 +39,7 @@ public struct NetworkConfiguration: Codable, Equatable, Sendable {
     public func validate() throws {
         for interface in NetworkInterface.allCases {
             guard let networks = self[interface] else { continue }
-            guard networks.count <= 512 else { throw ConfigurationError.tooManyNetworks }
+            guard networks.count <= Self.maximumNetworksPerInterface else { throw ConfigurationError.tooManyNetworks }
             for network in networks { _ = try CIDR(network) }
         }
     }
@@ -48,13 +50,15 @@ public struct NetworkConfiguration: Codable, Equatable, Sendable {
 }
 
 public enum ConfigurationError: LocalizedError {
-    case invalidPropertyList, invalidKey(String), tooManyNetworks, unsupportedBackup
+    case invalidPropertyList, invalidKey(String), tooManyNetworks, unsupportedBackup, duplicateNetwork, invalidSelection
     public var errorDescription: String? {
         switch self {
         case .invalidPropertyList: "Die Systemeinstellungen konnten nicht als gültige Property List gelesen werden."
         case .invalidKey(let key): "Die Einstellung \(key) enthält kein Array aus Zeichenketten. HallPass ändert diese Konfiguration nicht."
-        case .tooManyNetworks: "Pro Verbindung sind höchstens 512 Netzbereiche möglich."
+        case .tooManyNetworks: "Pro Verbindung sind höchstens \(NetworkConfiguration.maximumNetworksPerInterface) Netzbereiche möglich."
         case .unsupportedBackup: "Dieses Backup hat ein unbekanntes Format."
+        case .duplicateNetwork: "Dieser IP-Bereich ist für die gewählte Verbindung bereits vorhanden."
+        case .invalidSelection: "Der ausgewählte IP-Bereich ist nicht mehr vorhanden."
         }
     }
 }
@@ -85,12 +89,15 @@ public struct PreferencesSnapshot: Sendable {
 }
 
 public struct ConfigurationBackup: Codable, Sendable {
+    public static let maximumDataSize = 1_048_576
+    private static let currentVersion = 1
+
     public let formatVersion: Int
     public let createdAt: Date
     public let configuration: NetworkConfiguration
 
     public init(configuration: NetworkConfiguration) {
-        self.formatVersion = 1
+        self.formatVersion = Self.currentVersion
         self.createdAt = Date()
         self.configuration = configuration
     }
@@ -103,11 +110,11 @@ public struct ConfigurationBackup: Codable, Sendable {
     }
 
     public static func decode(_ data: Data) throws -> Self {
-        guard data.count <= 1_048_576 else { throw ConfigurationError.unsupportedBackup }
+        guard data.count <= maximumDataSize else { throw ConfigurationError.unsupportedBackup }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let backup = try decoder.decode(Self.self, from: data)
-        guard backup.formatVersion == 1 else { throw ConfigurationError.unsupportedBackup }
+        guard backup.formatVersion == currentVersion else { throw ConfigurationError.unsupportedBackup }
         // Keep legacy values inspectable. The draft is validated again before saving.
         return backup
     }
