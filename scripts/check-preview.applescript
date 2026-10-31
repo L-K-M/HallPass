@@ -88,20 +88,20 @@ tell application "System Events"
         if exists sheet 1 of window 1 then error "Search changed the draft."
 
         log "Select, copy, remove, and edit table rows"
-        set ranges to my networkTable()
+        set rangeTable to my networkTable()
         log "Click the first network row"
-        click row 1 of ranges
+        click row 1 of rangeTable
         keystroke "a" using command down
         keystroke "c" using command down
         delay pollDelay
         my assertCopiedRanges()
         key code deleteKey
         delay pollDelay
-        if (count rows of ranges) is not 0 then error "Delete did not remove the selected ranges."
+        if (count rows of rangeTable) is not 0 then error "Delete did not remove the selected ranges."
         keystroke "z" using command down
         delay pollDelay
-        if (count rows of ranges) is not 2 then error "Undo did not restore the selected ranges."
-        click row 1 of ranges
+        if (count rows of rangeTable) is not 2 then error "Undo did not restore the selected ranges."
+        click row 1 of rangeTable
         key code returnKey using command down
         my waitForSheet()
         keystroke "a" using command down
@@ -155,8 +155,8 @@ tell application "System Events"
         delay sheetSettleDelay
         key code returnKey
         my waitForNoSheet()
-        set ranges to my networkTable()
-        if (count rows of ranges) is not 2 then error "Backup round-trip did not restore both ranges."
+        set rangeTable to my networkTable()
+        if (count rows of rangeTable) is not 2 then error "Backup round-trip did not restore both ranges."
         my removeBackupFixture(backupFile)
 
         log "Apply preview changes and reload sample data"
@@ -171,8 +171,8 @@ tell application "System Events"
         my waitForNoSheet()
         keystroke "l" using command down
         delay sheetSettleDelay
-        set ranges to my networkTable()
-        if (count rows of ranges) is not 2 then error "Reload did not restore the sample configuration."
+        set rangeTable to my networkTable()
+        if (count rows of rangeTable) is not 2 then error "Reload did not restore the sample configuration."
 
         log "Resize and enter fullscreen"
         set size of window 1 to {720, 480}
@@ -183,7 +183,7 @@ tell application "System Events"
         keystroke "f" using {command down, control down}
         my waitForWindowed()
 
-        click row 1 of ranges
+        click row 1 of rangeTable
         keystroke "i" using {command down, option down}
         delay sheetSettleDelay
         keystroke "i" using {command down, option down}
@@ -202,8 +202,8 @@ end tell
 
 my waitForWindow()
 tell application "System Events" to tell process "HallPass"
-    set ranges to my networkTable()
-    click row 1 of ranges
+    set rangeTable to my networkTable()
+    click row 1 of rangeTable
     keystroke "i" using {command down, option down}
 end tell
 delay sheetSettleDelay
@@ -221,15 +221,20 @@ on requirePreview()
 end requirePreview
 
 on networkTable()
-    tell application "System Events" to tell process "HallPass"
-        repeat with uiElement in (get entire contents of window 1)
-            if (get role of uiElement) is in {"AXOutline", "AXTable"} then
-                try
-                    if (count columns of uiElement) is 3 then return uiElement
-                end try
-            end if
-        end repeat
-    end tell
+    repeat pollCount times
+        try
+            tell application "System Events" to tell process "HallPass"
+                repeat with uiElement in (get entire contents of window 1)
+                    if (get role of uiElement) is in {"AXOutline", "AXTable"} then
+                        try
+                            if (count columns of uiElement) is 3 then return uiElement
+                        end try
+                    end if
+                end repeat
+            end tell
+        end try
+        delay pollDelay
+    end repeat
     error "The network table is missing."
 end networkTable
 
@@ -359,14 +364,14 @@ end waitForNoSheet
 
 on waitForSearchFocus()
     repeat pollCount times
-        tell application "System Events" to tell process "HallPass"
-            set controls to get entire contents of toolbar 1 of window 1
-            repeat with uiElement in controls
-                if (get role of uiElement) is "AXTextField" then
-                    if (get focused of uiElement) then return
+        try
+            tell application "System Events" to tell process "HallPass"
+                set focusedControl to get value of attribute "AXFocusedUIElement"
+                if (get role of focusedControl) is "AXTextField" then
+                    if (get subrole of focusedControl) is "AXSearchField" then return
                 end if
-            end repeat
-        end tell
+            end tell
+        end try
         delay pollDelay
     end repeat
     error "Search did not receive keyboard focus."
