@@ -1,0 +1,10 @@
+Generated with the built-in image_gen tool. Opaque square artwork.
+
+Use case: stylized-concept.
+Asset type: production macOS application icon for HallPass, a utility for local-network access permissions.
+Primary request: a beautiful traditional Mac OS X icon in the realistic, richly illustrated style of the Tiger / Leopard / Snow Leopard era. Square, edge-to-edge, full bleed.
+Subject: one substantial ivory hall-pass ticket with die-cut admission-ticket notches and tactile paper grain, set at a slight diagonal. A large embossed emerald-green enamel checkmark is the unmistakable central symbol. A small beautifully rendered brushed-aluminum RJ45 Ethernet connector with gold contacts nestles against the ticket, communicating network access.
+Style and materials: meticulous realistic illustration, sculpted dimensional forms, subtle bevels, polished nickel details, warm cream cardstock, rich emerald accents, crisp contact shadows and restrained glossy highlights. It should feel like a lovingly crafted classic Mac utility icon, legible at small Dock sizes.
+Composition: a single coherent close-up icon, dominant ticket filling most of the square, strong simple silhouette, tight framing. Deep teal subtly textured background fills the entire square from edge to edge, all four edges and corners fully painted and opaque.
+Lighting: soft directional studio light, rich but natural depth, premium and inviting.
+Constraints: generate a single square icon image. No text, lettering, numerals, logos, watermark, border, blank margin, rounded-square container, pre-rounded image corners, presentation mockup, app window, or icon grid. Do not copy a specific existing Apple icon. Preserve the full square canvas.

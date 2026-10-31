@@ -43,12 +43,13 @@ struct InfoButton: View {
 struct TicketMark: View {
     var size: CGFloat = 36
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.27).fill(Palette.green.gradient)
-            Image(systemName: "ticket.fill").font(.system(size: size * 0.55, weight: .medium))
-                .rotationEffect(.degrees(-20)).foregroundStyle(.white)
-            Image(systemName: "checkmark").font(.system(size: size * 0.23, weight: .black))
-                .rotationEffect(.degrees(-20)).foregroundStyle(Palette.green)
+        Group {
+            if let url = Bundle.main.url(forResource: "HallPass", withExtension: "icns"),
+               let icon = NSImage(contentsOf: url) {
+                Image(nsImage: icon).resizable().interpolation(.high).aspectRatio(contentMode: .fit)
+            } else {
+                Image(systemName: "ticket.fill").font(.system(size: size * 0.7)).foregroundStyle(Palette.green)
+            }
         }
         .frame(width: size, height: size).accessibilityHidden(true)
     }

@@ -1,5 +1,7 @@
 # HallPass
 
+<img src="assets/HallPass-icon.png" width="160" height="160" alt="HallPass app icon">
+
 A SwiftUI macOS app for managing system-wide CIDR exemptions from the local-network privacy restriction. Requires **macOS 15.5 or later**, with no external dependencies.
 
 HallPass manages **system-wide** exemptions that apply to **all apps on this Mac**, in every network using the specified address ranges. It does not manage per-app local-network permissions, firewall rules, or Wi-Fi network names.
@@ -51,6 +53,10 @@ open dist/HallPass.app
 This produces `dist/HallPass.app` on the host architecture. Set `HALLPASS_BUILD_DIR` and/or `HALLPASS_OUTPUT_DIR` to override the build and output directories.
 
 The app is locally ad-hoc signed; it is not signed with an Apple developer certificate nor notarized.
+
+## Icon artwork
+
+The full square source is [assets/HallPass-icon.png](assets/HallPass-icon.png). The build resamples it into all ten macOS icon sizes and packages `HallPass.icns`; the same artwork appears in the sidebar. The artwork was created with the built-in image generation tool; its [exact prompt](assets/HallPass-icon.prompt.txt) is included.
 
 ## Tests
 

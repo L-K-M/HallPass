@@ -1,42 +1,94 @@
-import AppKit
+import CoreFoundation
+import CoreGraphics
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
-// A vector-drawn ticket mark, rendered at every native macOS icon size.
-let destination = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
+// Resample a square raster source (≥ 1024×1024) into all ten standard macOS
+// iconset PNGs at 16, 32, 128, 256, 512 points × 1x/2x.
+
+let args = CommandLine.arguments
+guard args.count == 3 else {
+    FileHandle.standardError.write("Usage: make-icon.swift SOURCE_PNG OUTPUT_ICONSET\n".data(using: .utf8)!)
+    exit(1)
+}
+
+let sourceURL = URL(fileURLWithPath: args[1])
+let destination = URL(fileURLWithPath: args[2], isDirectory: true)
+
+// Load source image via CGImage
+guard let sourceData = try? Data(contentsOf: sourceURL),
+      let sourceProvider = CGImageSourceCreateWithData(sourceData as CFData, nil),
+      let sourceImage = CGImageSourceCreateImageAtIndex(sourceProvider, 0, nil) else {
+    FileHandle.standardError.write("Error: cannot load image from \(sourceURL.path)\n".data(using: .utf8)!)
+    exit(1)
+}
+
+let srcWidth = sourceImage.width
+let srcHeight = sourceImage.height
+
+guard srcWidth == srcHeight else {
+    FileHandle.standardError.write("Error: source image must be square (\(srcWidth)×\(srcHeight))\n".data(using: .utf8)!)
+    exit(1)
+}
+
+guard srcWidth >= 1024 else {
+    FileHandle.standardError.write("Error: source image must be at least 1024×1024 (\(srcWidth)×\(srcHeight))\n".data(using: .utf8)!)
+    exit(1)
+}
+
+// Create the iconset directory
 try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
 
-for size in [16, 32, 128, 256, 512] {
-    for scale in [1, 2] {
+let sizes: [Int] = [16, 32, 128, 256, 512]
+let scales: [Int] = [1, 2]
+
+for size in sizes {
+    for scale in scales {
         let pixels = size * scale
-        let image = NSImage(size: NSSize(width: pixels, height: pixels))
-        image.lockFocus()
-        let context = NSGraphicsContext.current!.cgContext
-        context.scaleBy(x: CGFloat(pixels) / 1024, y: CGFloat(pixels) / 1024)
-        let tile = NSBezierPath(roundedRect: NSRect(x: 65, y: 65, width: 894, height: 894), xRadius: 206, yRadius: 206)
-        NSGradient(starting: NSColor(calibratedRed: 0.19, green: 0.53, blue: 0.43, alpha: 1),
-                   ending: NSColor(calibratedRed: 0.08, green: 0.30, blue: 0.25, alpha: 1))!
-            .draw(in: tile, angle: -65)
-        context.translateBy(x: 512, y: 512)
-        context.rotate(by: .pi / 10)
-        let ticket = NSBezierPath(roundedRect: NSRect(x: -290, y: -185, width: 580, height: 370), xRadius: 52, yRadius: 52)
-        NSColor(calibratedRed: 0.98, green: 0.97, blue: 0.91, alpha: 1).setFill()
-        ticket.fill()
-        NSColor(calibratedRed: 0.13, green: 0.41, blue: 0.33, alpha: 1).setFill()
-        NSBezierPath(ovalIn: NSRect(x: -324, y: -38, width: 76, height: 76)).fill()
-        NSBezierPath(ovalIn: NSRect(x: 248, y: -38, width: 76, height: 76)).fill()
-        let check = NSBezierPath()
-        check.move(to: NSPoint(x: -110, y: -4))
-        check.line(to: NSPoint(x: -28, y: -80))
-        check.line(to: NSPoint(x: 124, y: 84))
-        check.lineWidth = 40
-        check.lineCapStyle = .round
-        check.lineJoinStyle = .round
-        NSColor(calibratedRed: 0.13, green: 0.43, blue: 0.35, alpha: 1).setStroke()
-        check.stroke()
-        image.unlockFocus()
-        let bitmap = NSBitmapImageRep(data: image.tiffRepresentation!)!
+
+        // Create a bitmap context at the exact target pixel dimensions
+        guard let context = CGContext(
+            data: nil,
+            width: pixels,
+            height: pixels,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        ) else {
+            FileHandle.standardError.write("Error: cannot create graphics context for \(pixels)×\(pixels)\n".data(using: .utf8)!)
+            exit(1)
+        }
+
+        // Draw with high-quality resampling
+        context.interpolationQuality = .high
+        context.draw(sourceImage, in: CGRect(x: 0, y: 0, width: pixels, height: pixels))
+
+        guard let resizedImage = context.makeImage() else {
+            FileHandle.standardError.write("Error: cannot render image for \(pixels)×\(pixels)\n".data(using: .utf8)!)
+            exit(1)
+        }
+
+        // Write PNG using ImageIO
         let suffix = scale == 2 ? "@2x" : ""
-        let name = "icon_\(size)x\(size)\(suffix).png"
-        try bitmap.representation(using: .png, properties: [:])!.write(to: destination.appendingPathComponent(name))
+        let fileName = "icon_\(size)x\(size)\(suffix).png"
+        let outputURL = destination.appendingPathComponent(fileName)
+
+        guard let destProvider = CGImageDestinationCreateWithURL(
+            outputURL as CFURL,
+            UTType.png.identifier as CFString,
+            1,
+            nil
+        ) else {
+            FileHandle.standardError.write("Error: cannot create image destination for \(fileName)\n".data(using: .utf8)!)
+            exit(1)
+        }
+
+        CGImageDestinationAddImage(destProvider, resizedImage, nil)
+        guard CGImageDestinationFinalize(destProvider) else {
+            FileHandle.standardError.write("Error: cannot write \(fileName)\n".data(using: .utf8)!)
+            exit(1)
+        }
     }
 }

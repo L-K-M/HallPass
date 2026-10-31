@@ -18,7 +18,7 @@ cp "$BIN_DIR/HallPass" "$APP/Contents/MacOS/HallPass"
 cp "$PROJECT_ROOT/Info.plist" "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-swift "$PROJECT_ROOT/scripts/make-icon.swift" "$BUILD_DIR/HallPass.iconset"
+swift "$PROJECT_ROOT/scripts/make-icon.swift" "$PROJECT_ROOT/assets/HallPass-icon.png" "$BUILD_DIR/HallPass.iconset"
 /usr/bin/iconutil -c icns "$BUILD_DIR/HallPass.iconset" -o "$APP/Contents/Resources/HallPass.icns"
 /usr/bin/codesign --force --sign - "$APP"
 /usr/bin/codesign --verify --strict "$APP"
