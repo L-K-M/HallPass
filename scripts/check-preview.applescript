@@ -5,6 +5,7 @@ property escapeKey : 53
 property deleteKey : 51
 property pollCount : 80
 property pollDelay : 0.25
+property sheetSettleDelay : 1
 
 tell application "HallPass" to activate
 tell application "System Events"
@@ -98,7 +99,10 @@ error "The configuration window did not reopen."
 on waitForSheet()
     repeat pollCount times
         tell application "System Events" to tell process "HallPass"
-            if exists sheet 1 of window 1 then return
+            if exists sheet 1 of window 1 then
+                delay sheetSettleDelay
+                return
+            end if
         end tell
         delay pollDelay
     end repeat
