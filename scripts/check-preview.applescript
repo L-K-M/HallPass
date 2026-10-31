@@ -275,7 +275,7 @@ on assertCopiedRanges()
 end assertCopiedRanges
 
 on requireBackupFile(filePath)
-    do shell script "/usr/bin/test -s " & quoted form of filePath
+    do shell script "/bin/test -s " & quoted form of filePath
 end requireBackupFile
 
 on removeBackupFixture(filePath)
