@@ -103,6 +103,7 @@ struct WindowConnection: NSViewRepresentable {
         // Objective-C introspection only reads this weak reference; connection stays on the main actor.
         nonisolated(unsafe) private weak var originalDelegate: (any NSWindowDelegate)?
         private weak var window: NSWindow?
+        private var mouseMonitor: Any?
 
         init(model: HallPassModel, connected: @escaping (NSWindow) -> Void) {
             self.model = model
@@ -120,15 +121,18 @@ struct WindowConnection: NSViewRepresentable {
             WindowLifecycle.shared.window = window
             DispatchQueue.main.async { self.connected(window) }
             if CommandLine.arguments.contains("--diagnose-clicks") {
-                _ = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak window] event in
-                    guard let window, event.window === window, let content = window.contentView else { return event }
+                mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
+                    guard let window = event.window, let content = window.contentView else { return event }
                     let point = content.convert(event.locationInWindow, from: nil)
                     let hit = content.hitTest(point)
-                    print("Mouse event: window=\(event.locationInWindow) content=\(point) hit=\(String(describing: hit))")
+                    let message = "Mouse event: number=\(window.windowNumber) window=\(event.locationInWindow) content=\(point) hit=\(String(describing: hit))\n"
+                    FileHandle.standardOutput.write(Data(message.utf8))
                     var view = hit
                     while let current = view {
                         if let table = current as? NSTableView {
-                            DispatchQueue.main.async { print("Native selected rows: \(table.selectedRowIndexes)") }
+                            DispatchQueue.main.async {
+                                FileHandle.standardOutput.write(Data("Native selected rows: \(table.selectedRowIndexes)\n".utf8))
+                            }
                             break
                         }
                         view = current.superview
