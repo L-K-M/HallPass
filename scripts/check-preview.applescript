@@ -325,12 +325,15 @@ end waitForWindowed
 
 on waitForSheet()
     repeat pollCount times
-        tell application "System Events" to tell process "HallPass"
-            if exists sheet 1 of window 1 then
-                delay sheetSettleDelay
-                return
-            end if
-        end tell
+        -- AppKit replaces accessibility objects during sheet transitions.
+        try
+            tell application "System Events" to tell process "HallPass"
+                if exists sheet 1 of window 1 then
+                    delay sheetSettleDelay
+                    return
+                end if
+            end tell
+        end try
         delay pollDelay
     end repeat
     error "The expected sheet did not open."
@@ -338,12 +341,14 @@ end waitForSheet
 
 on waitForNoSheet()
     repeat pollCount times
-        tell application "System Events" to tell process "HallPass"
-            if not (exists sheet 1 of window 1) then
-                delay pollDelay
-                return
-            end if
-        end tell
+        try
+            tell application "System Events" to tell process "HallPass"
+                if not (exists sheet 1 of window 1) then
+                    delay sheetSettleDelay
+                    return
+                end if
+            end tell
+        end try
         delay pollDelay
     end repeat
     error "The sheet did not close."

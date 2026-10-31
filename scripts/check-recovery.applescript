@@ -39,12 +39,14 @@ end requireText
 
 on waitForSheet()
     repeat pollCount times
-        tell application "System Events" to tell process "HallPass"
-            if exists sheet 1 of window 1 then
-                delay sheetSettleDelay
-                return
-            end if
-        end tell
+        try
+            tell application "System Events" to tell process "HallPass"
+                if exists sheet 1 of window 1 then
+                    delay sheetSettleDelay
+                    return
+                end if
+            end tell
+        end try
         delay pollDelay
     end repeat
     error "The expected unsaved-change sheet did not open."
@@ -52,12 +54,14 @@ end waitForSheet
 
 on waitForNoSheet()
     repeat pollCount times
-        tell application "System Events" to tell process "HallPass"
-            if not (exists sheet 1 of window 1) then
-                delay sheetSettleDelay
-                return
-            end if
-        end tell
+        try
+            tell application "System Events" to tell process "HallPass"
+                if not (exists sheet 1 of window 1) then
+                    delay sheetSettleDelay
+                    return
+                end if
+            end tell
+        end try
         delay pollDelay
     end repeat
     error "Cancel did not dismiss the unsaved-change sheet."
