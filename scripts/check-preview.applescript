@@ -154,7 +154,7 @@ tell application "System Events"
         keystroke backupFile
         key code returnKey
         delay sheetSettleDelay
-        key code returnKey
+        my pressSheetButton("Importieren")
         my waitForNoSheet()
         if my numberOfRanges() is not 2 then error "Backup round-trip did not restore both ranges."
         my removeBackupFixture(backupFile)
