@@ -90,7 +90,7 @@ Tests cover CIDR edge cases, legacy backup compatibility, duplicate-aware review
 
 The format/editing tests also run on Linux; AppKit model tests and the seven `defaults` integration tests require macOS. CI uses macOS 26 with Xcode 26.0.1 to test, build, verify signing, launch the actual app in preview, and retain a screenshot and app archive.
 
-For a safe manual session:
+For a manual session, quit HallPass first, then launch preview:
 
 ```sh
 open dist/HallPass.app --args --demo

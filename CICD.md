@@ -24,10 +24,12 @@ never cancelled.
 Third-party actions are pinned to immutable commit SHAs for the same reason
 `zai-code-review.yml` pins its action.
 
-After packaging, CI launches the actual app with `--demo`, checks that it is
-running, captures the desktop, and quits it. The `HallPass-macos-universal`
-artifact contains the app ZIP and `HallPass-preview.png`. This is a launch
-check and real screenshot, not an interaction or privileged-write test.
+After packaging, CI launches the actual app with `--demo` and exercises its
+keyboard workflow through System Events: editing, undo/redo, review,
+file-panel cancellation, search, inspector, and window reopening. This
+requires Accessibility access on the runner and never applies system settings.
+The `HallPass-macos-universal` artifact retains the app ZIP, real desktop
+screenshot, and preview log; failure captures remain available for diagnosis.
 
 `workflow_dispatch` is enabled. It was added family-wide when GitHub throttled
 webhook delivery during an Actions incident and `pull_request` events stopped
@@ -43,6 +45,13 @@ swift test
 ```
 
 This requires Xcode 26 to match CI.
+
+To repeat the UI check, quit HallPass, then run:
+
+```sh
+open dist/HallPass.app --args --demo
+osascript scripts/check-preview.applescript
+```
 
 ## PR review (`zai-code-review.yml`)
 

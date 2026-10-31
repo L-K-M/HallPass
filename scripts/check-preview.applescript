@@ -17,7 +17,13 @@ tell application "System Events"
         my waitForNoSheet()
 
         log "Review additions with CmdS"
-        log (entire contents of window 1)
+        set windowContents to get entire contents of window 1
+        -- Some accessibility containers do not expose a value.
+        repeat with element in windowContents
+            try
+                log {role of element, name of element, value of element}
+            end try
+        end repeat
         keystroke "s" using command down
         my waitForSheet()
         key code escapeKey

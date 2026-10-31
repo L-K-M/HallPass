@@ -86,6 +86,23 @@ jobs:
       - name: Archive the app
         run: ditto -c -k --sequesterRsrc --keepParent dist/HallPass.app dist/HallPass-macos-universal.zip
 
+      - name: Check out the original interface for diagnosis
+        if: failure() && steps.keyboard.outcome == 'failure'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 831065a
+          path: .build/reference-app
+          persist-credentials: false
+
+      - name: Capture the original interface on the same runner
+        if: failure() && steps.keyboard.outcome == 'failure'
+        run: |
+          .build/reference-app/scripts/build-app.sh
+          open --stdout "$PWD/dist/HallPass-reference.log" --stderr "$PWD/dist/HallPass-reference.log" .build/reference-app/dist/HallPass.app --args --demo
+          sleep 10
+          screencapture -x dist/HallPass-reference.png
+          osascript -e 'tell application "HallPass" to quit'
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -94,3 +111,5 @@ jobs:
             dist/HallPass-macos-universal.zip
             dist/HallPass-preview.png
             dist/HallPass-preview.log
+            dist/HallPass-reference.png
+            dist/HallPass-reference.log
