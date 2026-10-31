@@ -89,6 +89,7 @@ tell application "System Events"
 
         log "Select, copy, remove, and edit table rows"
         set ranges to my networkTable()
+        log "Click the first network row"
         click row 1 of ranges
         keystroke "a" using command down
         keystroke "c" using command down
@@ -223,7 +224,9 @@ on networkTable()
     tell application "System Events" to tell process "HallPass"
         repeat with uiElement in (get entire contents of window 1)
             if (get role of uiElement) is in {"AXOutline", "AXTable"} then
-                if (count columns of uiElement) is 3 then return contents of uiElement
+                try
+                    if (count columns of uiElement) is 3 then return uiElement
+                end try
             end if
         end repeat
     end tell
