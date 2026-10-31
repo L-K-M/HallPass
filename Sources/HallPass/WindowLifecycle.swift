@@ -89,7 +89,8 @@ struct WindowConnection: NSViewRepresentable {
     final class Coordinator: NSObject, NSWindowDelegate {
         private let model: HallPassModel
         private let connected: (NSWindow) -> Void
-        private weak var originalDelegate: (any NSWindowDelegate)?
+        // Objective-C introspection only reads this weak reference; connection stays on the main actor.
+        nonisolated(unsafe) private weak var originalDelegate: (any NSWindowDelegate)?
         private weak var window: NSWindow?
 
         init(model: HallPassModel, connected: @escaping (NSWindow) -> Void) {

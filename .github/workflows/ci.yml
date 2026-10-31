@@ -40,7 +40,7 @@ jobs:
           xcode-version: '26.0'
 
       - name: Build
-        run: swift build
+        run: swift build -Xswiftc -warnings-as-errors
 
       - name: Test
         run: swift test
@@ -63,17 +63,31 @@ jobs:
           codesign --verify --deep --strict "$APP"
 
       - name: Launch the actual app with sample data
+        id: preview
         run: |
           open dist/HallPass.app --args --demo
-          sleep 5
+          sleep 20
           pgrep -x HallPass
+
+      - name: Exercise the preview keyboard workflow
+        id: keyboard
+        run: osascript scripts/check-preview.applescript
+
+      - name: Capture the running preview
+        if: always() && steps.preview.outcome == 'success'
+        run: |
           screencapture -x dist/HallPass-preview.png
-          osascript -e 'tell application "HallPass" to quit'
+          if test '${{ steps.keyboard.outcome }}' = success; then
+            osascript -e 'tell application "HallPass" to quit'
+          else
+            pkill -x HallPass
+          fi
 
       - name: Archive the app
         run: ditto -c -k --sequesterRsrc --keepParent dist/HallPass.app dist/HallPass-macos-universal.zip
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
         with:
           name: HallPass-macos-universal
           path: |
