@@ -9,7 +9,6 @@ struct HallPassApp: App {
         // One machine-wide configuration has one draft, rather than competing windows.
         Window("HallPass", id: "main") {
             ContentView(model: model)
-                .frame(minWidth: 720, minHeight: 480)
         }
         .defaultSize(width: 980, height: 640)
         .windowResizability(.contentMinSize)

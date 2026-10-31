@@ -115,6 +115,7 @@ struct WindowConnection: NSViewRepresentable {
             originalDelegate = window.delegate
             window.delegate = self
             window.isReleasedWhenClosed = false
+            window.minSize = NSSize(width: 720, height: 480)
             window.tabbingMode = .disallowed
             window.collectionBehavior.subtract([.fullScreenNone, .fullScreenAuxiliary])
             window.collectionBehavior.insert(.fullScreenPrimary)
