@@ -171,7 +171,22 @@ struct ContentView: View {
             }
             .width(min: 110, ideal: 125)
         }
+        .focused($tableFocused)
         .disabled(model.busy)
+        .searchable(text: $searchText, placement: .toolbar, prompt: "IP-Bereiche suchen")
+        .searchFocused($searchFocused)
+        .onDeleteCommand {
+            guard model.canEdit, available, tableFocused, !searchFocused else { return }
+            model.remove(selection, interface: interface)
+        }
+        .onCopyCommand(perform: selectedRows.isEmpty ? nil : {
+            [NSItemProvider(object: selectedRows.map(\.notation).joined(separator: "\n") as NSString)]
+        })
+        .onKeyPress(.return) {
+            guard available, model.canEdit, tableFocused, !searchFocused, selectedRows.count == 1 else { return .ignored }
+            perform(.edit)
+            return .handled
+        }
         .accessibilityLabel("IP-Bereiche für \(interface.title)")
     }
 
