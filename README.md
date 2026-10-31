@@ -1,8 +1,13 @@
 # HallPass
 
+> [!IMPORTANT]
+> LLM disclosure: This codebase was written with substantial help from large language models: AI coding agents working from the [`AGENTS.md`](AGENTS.md) brief in this repo.
+
 <img src="assets/HallPass-icon.png" width="160" height="160" alt="HallPass app icon">
 
 A SwiftUI macOS app for managing system-wide CIDR exemptions from the local-network privacy restriction. Requires **macOS 15.5 or later**, with no external dependencies.
+
+**Latest release:** v<!-- version -->1.0.0<!-- /version --> · [Download](https://github.com/L-K-M/HallPass/releases/latest)
 
 HallPass manages **system-wide** exemptions that apply to **all apps on this Mac**, in every network using the specified address ranges. It does not manage per-app local-network permissions, firewall rules, or Wi-Fi network names.
 
@@ -67,3 +72,7 @@ swift test
 Tests cover CIDR edge cases, backup serialization, type handling, conflict detection, preservation of unrelated keys, and save/rollback logic. Integration tests use only temporary plist domains — no real network settings and no administrator prompts. The macOS preferences service may block these temporary accesses in a restrictive sandbox.
 
 The real privileged write path and post-reboot effect were not exercised during development testing; validating them requires a test installation, a reboot, and a normally-launched GUI app (terminal and root processes already have exemptions per Apple).
+
+## License
+
+HallPass's own code is released under the [Unlicense](LICENSE). The app bundles no third-party components.
