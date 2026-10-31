@@ -1,4 +1,14 @@
 #!/bin/bash
+# Builds dist/HallPass.app from the SwiftPM package, writes its icon, ad-hoc
+# signs the bundle and verifies the signature.
+#
+#   scripts/build-app.sh [--debug] [--universal]
+#
+# --debug builds the Debug configuration (scripts/build.sh --debug reaches this
+# through lkm-build's swiftpm kind). --universal builds a fat arm64+x86_64
+# binary; the default is the host architecture, which is faster for local runs.
+# HALLPASS_BUILD_DIR and/or HALLPASS_OUTPUT_DIR override the build and output
+# directories.
 set -euo pipefail
 
 MINIMUM_SDK_MAJOR=26
@@ -16,13 +26,24 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="${HALLPASS_BUILD_DIR:-$PROJECT_ROOT/.build}"
 OUTPUT_DIR="${HALLPASS_OUTPUT_DIR:-$PROJECT_ROOT/dist}"
 APP="$OUTPUT_DIR/HallPass.app"
+
+CONFIG=release
+ARCH_ARGS=()
+for arg in "$@"; do
+  case "$arg" in
+    --debug) CONFIG=debug ;;
+    --universal) ARCH_ARGS=(--arch arm64 --arch x86_64) ;;
+    *) echo "error: unknown option '$arg' (expected --debug or --universal)" >&2; exit 2 ;;
+  esac
+done
+
 mkdir -p "$BUILD_DIR" "$OUTPUT_DIR"
 export CLANG_MODULE_CACHE_PATH="$BUILD_DIR/clang-cache"
 export SWIFTPM_MODULECACHE_OVERRIDE="$BUILD_DIR/module-cache"
 
 cd "$PROJECT_ROOT"
-swift build -c release --scratch-path "$BUILD_DIR" --cache-path "$BUILD_DIR/package-cache" --disable-sandbox
-BIN_DIR="$(swift build -c release --scratch-path "$BUILD_DIR" --cache-path "$BUILD_DIR/package-cache" --disable-sandbox --show-bin-path)"
+swift build -c "$CONFIG" --scratch-path "$BUILD_DIR" --cache-path "$BUILD_DIR/package-cache" --disable-sandbox ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"}
+BIN_DIR="$(swift build -c "$CONFIG" --scratch-path "$BUILD_DIR" --cache-path "$BUILD_DIR/package-cache" --disable-sandbox --show-bin-path ${ARCH_ARGS[@]+"${ARCH_ARGS[@]}"})"
 
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/HallPass" "$APP/Contents/MacOS/HallPass"

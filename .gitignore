@@ -1,5 +1,8 @@
 .build/
 .swiftpm/
+build/
 dist/
 .DS_Store
 *.xcuserstate
+.idea/
+.vscode/

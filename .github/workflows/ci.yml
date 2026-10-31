@@ -1,33 +1,67 @@
-name: macOS
+name: CI
 
 on:
+  pull_request:
   push:
     branches: [main]
-  pull_request:
+  # Dispatch remains available when webhook delivery is delayed.
   workflow_dispatch:
 
-# Building and testing require no repository write access.
+# The build/test job only needs to read the repository.
 permissions:
   contents: read
 
-# Superseded PRs may stop; main builds remain useful for bisecting failures.
+# Cancel superseded PR runs, while retaining complete main-branch results.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
+  build-test:
+    name: Build, Test & Package
     runs-on: macos-26
-    # Bound test or GUI-launch failures rather than consuming a runner indefinitely.
-    timeout-minutes: 15
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.0.1.app/Contents/Developer
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - name: Test formats, preferences, draft undo, and recovery
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check license statements and bundle identity
+        run: |
+          grep -q '^## License$' README.md || { echo "::error::README.md lacks its '## License' section"; exit 1; }
+          test "$(/usr/libexec/PlistBuddy -c 'Print :NSHumanReadableCopyright' Info.plist)" = 'Public domain (Unlicense)' \
+            || { echo "::error::Info.plist NSHumanReadableCopyright must be 'Public domain (Unlicense)'"; exit 1; }
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Info.plist)" = 'ch.lkmc.HallPass' \
+            || { echo "::error::Info.plist CFBundleIdentifier must be 'ch.lkmc.HallPass'"; exit 1; }
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: '26.0'
+
+      - name: Build
+        run: swift build
+
+      - name: Test
         run: swift test
-      - name: Build and verify the app bundle
-        run: ./scripts/build-app.sh
+
+      # Keep the release packaging invocation covered on every change.
+      - name: Assemble HallPass.app (universal)
+        run: ./scripts/build-app.sh --universal
+
+      - name: Check the built app
+        run: |
+          APP=dist/HallPass.app
+          BIN="$APP/Contents/MacOS/HallPass"
+          test -x "$BIN" || { echo "::error::$BIN missing or not executable"; exit 1; }
+          lipo -info "$BIN" | grep -q 'arm64.*x86_64\|x86_64.*arm64' \
+            || { echo "::error::$BIN is not a universal arm64+x86_64 binary"; exit 1; }
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = 'ch.lkmc.HallPass' \
+            || { echo "::error::built app lost its bundle identifier"; exit 1; }
+          test -f "$APP/Contents/Resources/HallPass.icns" \
+            || { echo "::error::built app lacks its icon"; exit 1; }
+          codesign --verify --deep --strict "$APP"
+
       - name: Launch the actual app with sample data
         run: |
           open dist/HallPass.app --args --demo
@@ -35,11 +69,13 @@ jobs:
           pgrep -x HallPass
           screencapture -x dist/HallPass-preview.png
           osascript -e 'tell application "HallPass" to quit'
+
       - name: Archive the app
-        run: ditto -c -k --sequesterRsrc --keepParent dist/HallPass.app dist/HallPass-macos-arm64.zip
-      - uses: actions/upload-artifact@v4
+        run: ditto -c -k --sequesterRsrc --keepParent dist/HallPass.app dist/HallPass-macos-universal.zip
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: HallPass-macos-arm64
+          name: HallPass-macos-universal
           path: |
-            dist/HallPass-macos-arm64.zip
+            dist/HallPass-macos-universal.zip
             dist/HallPass-preview.png
