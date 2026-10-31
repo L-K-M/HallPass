@@ -143,12 +143,11 @@ struct ReviewView: View {
     private func changeRow(_ network: String, kind: ChangeKind) -> some View {
         HStack(spacing: 10) {
             Image(systemName: kind.symbol).foregroundStyle(kind == .addition ? Color.accentColor : Color.orange)
+                .accessibilityHidden(true)
             Text(network).monospaced()
             Spacer()
             Text(kind.title).font(.callout).foregroundStyle(.secondary)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(kind.title): \(network)")
     }
 
     private func structuralChange(_ interface: NetworkInterface) -> String {
