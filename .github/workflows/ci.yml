@@ -71,6 +71,7 @@ jobs:
 
       - name: Exercise the preview keyboard workflow
         id: keyboard
+        timeout-minutes: 5
         run: osascript scripts/check-preview.applescript
 
       - name: Capture the running preview

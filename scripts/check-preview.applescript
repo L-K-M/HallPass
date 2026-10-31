@@ -297,16 +297,21 @@ on chooseMenuCommand(commandName)
 end chooseMenuCommand
 
 on pressSheetButton(buttonName)
-    tell application "System Events" to tell process "HallPass"
-        repeat with uiElement in (get entire contents of sheet 1 of window 1)
-            if (get role of uiElement) is "AXButton" then
-                if (get name of uiElement) is buttonName or (get description of uiElement) is buttonName then
-                    click uiElement
-                    return
+    with timeout of 30 seconds
+        tell application "System Events" to tell process "HallPass"
+            repeat with uiElement in (get entire contents of sheet 1 of window 1)
+                if (get role of uiElement) is "AXButton" then
+                    if (get name of uiElement) is buttonName or (get description of uiElement) is buttonName then
+                        set buttonPosition to get position of uiElement
+                        set buttonSize to get size of uiElement
+                        log "Press native sheet button: " & buttonName
+                        my postMouseClick((item 1 of buttonPosition) + (item 1 of buttonSize) div 2, (item 2 of buttonPosition) + (item 2 of buttonSize) div 2)
+                        return
+                    end if
                 end if
-            end if
-        end repeat
-    end tell
+            end repeat
+        end tell
+    end timeout
     error "The sheet button is missing: " & buttonName
 end pressSheetButton
 
