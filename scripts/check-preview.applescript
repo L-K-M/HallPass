@@ -154,7 +154,7 @@ tell application "System Events"
         keystroke backupFile
         key code returnKey
         delay sheetSettleDelay
-        my pressSheetButton("Importieren")
+        my pressNativeImport()
         my waitForNoSheet()
         if my numberOfRanges() is not 2 then error "Backup round-trip did not restore both ranges."
         my removeBackupFixture(backupFile)
@@ -314,6 +314,18 @@ on pressSheetButton(buttonName)
     end timeout
     error "The sheet button is missing: " & buttonName
 end pressSheetButton
+
+on pressNativeImport()
+    log "Activate the selected file's Import button"
+    with timeout of 30 seconds
+        tell application "System Events" to tell process "HallPass"
+            set importButton to get button "Importieren" of sheet 1 of window 1
+            set buttonPosition to get position of importButton
+            set buttonSize to get size of importButton
+        end tell
+    end timeout
+    my postMouseClick((item 1 of buttonPosition) + (item 1 of buttonSize) div 2, (item 2 of buttonPosition) + (item 2 of buttonSize) div 2)
+end pressNativeImport
 
 on requireSheetText(expectedText)
     tell application "System Events" to tell process "HallPass"
