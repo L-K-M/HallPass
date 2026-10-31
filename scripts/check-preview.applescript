@@ -237,20 +237,17 @@ end networkTable
 on numberOfRanges()
     set rangeTable to my networkTable()
     tell application "System Events"
-        return count of (get value of attribute "AXRows" of rangeTable)
+        return count rows of rangeTable
     end tell
 end numberOfRanges
 
 on clickRange(rowIndex)
     set rangeTable to my networkTable()
     tell application "System Events"
-        log rangeTable
-        set tableRows to get value of attribute "AXRows" of rangeTable
-        log tableRows
-        set targetRow to item rowIndex of tableRows
-        log targetRow
-        set rowPosition to get value of attribute "AXPosition" of targetRow
-        set rowSize to get value of attribute "AXSize" of targetRow
+        set targetRow to get row rowIndex of rangeTable
+        log (get role of targetRow)
+        set rowPosition to get position of targetRow
+        set rowSize to get size of targetRow
         click at {(item 1 of rowPosition) + (item 1 of rowSize) / 2, (item 2 of rowPosition) + (item 2 of rowSize) / 2}
     end tell
     delay pollDelay
