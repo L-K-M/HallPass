@@ -68,7 +68,10 @@ struct WindowConnection: NSViewRepresentable {
 
     func makeNSView(context: Context) -> ConnectionView {
         let view = ConnectionView()
-        view.connect = { [weak coordinator = context.coordinator] in coordinator?.connect(to: $0) }
+        view.connect = { [weak coordinator = context.coordinator] window in
+            // Let SwiftUI finish installing the window before interposing its delegate.
+            DispatchQueue.main.async { coordinator?.connect(to: window) }
+        }
         return view
     }
 

@@ -65,7 +65,7 @@ jobs:
       - name: Launch the actual app with sample data
         id: preview
         run: |
-          open dist/HallPass.app --args --demo
+          open --stdout "$PWD/dist/HallPass-preview.log" --stderr "$PWD/dist/HallPass-preview.log" dist/HallPass.app --args --demo
           sleep 20
           pgrep -x HallPass
 
@@ -93,3 +93,4 @@ jobs:
           path: |
             dist/HallPass-macos-universal.zip
             dist/HallPass-preview.png
+            dist/HallPass-preview.log

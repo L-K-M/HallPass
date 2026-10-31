@@ -81,7 +81,7 @@ struct ContentView: View {
             model: model, available: available, selectionCount: selectedRows.count,
             tableFocused: tableFocused, showsInspector: showsInspector, interface: interface, perform: perform
         ))
-        .background(WindowConnection(model: model) { window = $0 })
+        .background(WindowConnection(model: model) { window = $0 }.frame(width: 0, height: 0))
         .task { model.restoreSession() }
         .sheet(item: $sheet) { request in
             switch request {
