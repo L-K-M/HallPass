@@ -119,6 +119,23 @@ struct WindowConnection: NSViewRepresentable {
             WindowLifecycle.shared.model = model
             WindowLifecycle.shared.window = window
             DispatchQueue.main.async { self.connected(window) }
+            if CommandLine.arguments.contains("--diagnose-clicks") {
+                _ = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak window] event in
+                    guard let window, event.window === window, let content = window.contentView else { return event }
+                    let point = content.convert(event.locationInWindow, from: nil)
+                    let hit = content.hitTest(point)
+                    print("Mouse event: window=\(event.locationInWindow) content=\(point) hit=\(String(describing: hit))")
+                    var view = hit
+                    while let current = view {
+                        if let table = current as? NSTableView {
+                            DispatchQueue.main.async { print("Native selected rows: \(table.selectedRowIndexes)") }
+                            break
+                        }
+                        view = current.superview
+                    }
+                    return event
+                }
+            }
         }
 
         func windowShouldClose(_ sender: NSWindow) -> Bool {

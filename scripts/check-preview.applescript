@@ -253,6 +253,7 @@ on clickRange(rowIndex)
         log rowSize
         set clickX to (item 1 of rowPosition) + (item 1 of rowSize) div 2
         set clickY to (item 2 of rowPosition) + (item 2 of rowSize) div 2
+        log {clickX, clickY}
         my postMouseClick(clickX, clickY)
         delay pollDelay
         if not (get selected of targetRow) then error "The mouse click did not select the network row."
