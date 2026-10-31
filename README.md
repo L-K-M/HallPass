@@ -60,6 +60,8 @@ Missing keys and empty arrays are distinguished. Unusual string values found on 
 
 Real drafts are atomically saved to `~/Library/Application Support/HallPass/Draft.json` after each change, with private file permissions. On relaunch, recovery restores both the draft and its original baseline; saving still checks for external changes. Successful loading/applying or explicitly discarding removes recovery. Preview never creates recovery files or automatic backups.
 
+Unreadable or unsupported recovery files are preserved unchanged in the backup folder before new drafts are written. If preservation fails, real editing stays disabled until the folder permissions are fixed and HallPass is restarted. Ending a preview also checks for an existing real draft.
+
 HallPass edits system configuration, not user documents. JSON backup version 1 is unchanged; no general `.json` Finder association is installed.
 
 ## Build

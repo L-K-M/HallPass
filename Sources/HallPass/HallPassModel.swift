@@ -69,10 +69,10 @@ final class HallPassModel {
     }
 
     func restoreSession() {
-        guard !restoredSession else { return }
-        restoredSession = true
         guard !isDemo else { return }
         restoreRestartState()
+        guard !restoredSession else { return }
+        restoredSession = true
 
         do {
             guard let recovery = try backups.loadRecovery() else { return }
@@ -110,7 +110,7 @@ final class HallPassModel {
         draft = .init()
         notice = nil
         undoManager.removeAllActions()
-        restoreRestartState()
+        restoreSession()
     }
 
     func load() async {
