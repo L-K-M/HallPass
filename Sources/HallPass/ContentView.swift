@@ -86,7 +86,6 @@ struct ContentView: View {
 
     var body: some View {
         windowContents
-        .background(WindowConnection(model: model) { window = $0 }.frame(width: 0, height: 0))
         .task { model.restoreSession() }
         .onChange(of: windowUndoManager, initial: true) { model.useUndoManager(windowUndoManager) }
         .sheet(item: $sheet) { request in
