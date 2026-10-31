@@ -173,8 +173,6 @@ struct ContentView: View {
         }
         .focused($tableFocused)
         .disabled(model.busy)
-        .searchable(text: $searchText, placement: .toolbar, prompt: "IP-Bereiche suchen")
-        .searchFocused($searchFocused)
         .accessibilityLabel("IP-Bereiche für \(interface.title)")
     }
 
