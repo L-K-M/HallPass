@@ -244,10 +244,13 @@ end numberOfRanges
 on clickRange(rowIndex)
     set rangeTable to my networkTable()
     tell application "System Events"
+        log rangeTable
         set tableRows to get value of attribute "AXRows" of rangeTable
+        log tableRows
         set targetRow to item rowIndex of tableRows
-        set rowPosition to get position of targetRow
-        set rowSize to get size of targetRow
+        log targetRow
+        set rowPosition to get value of attribute "AXPosition" of targetRow
+        set rowSize to get value of attribute "AXSize" of targetRow
         click at {(item 1 of rowPosition) + (item 1 of rowSize) / 2, (item 2 of rowPosition) + (item 2 of rowSize) / 2}
     end tell
     delay pollDelay
