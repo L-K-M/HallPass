@@ -90,7 +90,7 @@ swift test
 
 Tests cover CIDR edge cases, legacy backup compatibility, duplicate-aware review, recovery, named draft undo/redo, import/export, conflict detection, unrelated-key preservation, and save/rollback logic. Integration tests use temporary plist domains — no real network settings or administrator prompts. A restrictive sandbox may block these temporary accesses.
 
-The format/editing tests also run on Linux; AppKit model tests and the seven `defaults` integration tests require macOS. CI uses macOS 26 with Xcode 26.0.1 to test, build, verify signing, launch the actual app in preview, and retain a screenshot and app archive.
+The format/editing tests also run on Linux; AppKit model tests and the seven `defaults` integration tests require macOS. CI uses macOS 26 with Xcode 26.0.1 to run debug/release tests, verify host/universal builds and signing, and exercise the actual app through mouse and keyboard. Screenshots and the universal app archive are retained; see [CICD.md](CICD.md).
 
 For a manual session, quit HallPass first, then launch preview:
 

@@ -26,6 +26,8 @@ The interface is in German; Help and the selection inspector explain its scope.
   `~/Library/Application Support/HallPass/Backups/`.
 - **Recovery:** real drafts and their original baselines are atomically saved to
   `~/Library/Application Support/HallPass/Draft.json`; preview never writes it.
+  Failed recovery originals are moved unchanged into Backups. If that fails,
+  real editing is blocked so the original cannot be overwritten.
 - **Window:** one machine-wide draft; native sidebar, table, inspector and
   toolbar. Closing the window keeps the app running. Draft undo is separate
   from committed system state and clears on successful loading/applying.

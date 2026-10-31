@@ -211,8 +211,8 @@ return "Preview editing, focus, undo, selection, backup round-trip, apply, resiz
 on requirePreview()
     tell application "System Events" to tell process "HallPass"
         repeat with uiElement in (get entire contents of window 1)
-            if (get role of uiElement) is "AXButton" then
-                if (get name of uiElement) is "Vorschau beenden" then return
+            if (get role of uiElement) is "AXStaticText" then
+                if (get value of uiElement) is "Vorschau" then return
             end if
         end repeat
     end tell
@@ -259,7 +259,7 @@ on pressSheetButton(buttonName)
     tell application "System Events" to tell process "HallPass"
         repeat with uiElement in (get entire contents of sheet 1 of window 1)
             if (get role of uiElement) is "AXButton" then
-                if (get name of uiElement) is buttonName then
+                if (get name of uiElement) is buttonName or (get description of uiElement) is buttonName then
                     click uiElement
                     return
                 end if

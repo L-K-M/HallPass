@@ -24,12 +24,23 @@ never cancelled.
 Third-party actions are pinned to immutable commit SHAs for the same reason
 `zai-code-review.yml` pins its action.
 
-After packaging, CI launches the actual app with `--demo` and exercises its
-keyboard workflow through System Events: editing, undo/redo, review,
-file-panel cancellation, search, inspector, and window reopening. This
-requires Accessibility access on the runner and never applies system settings.
-The `HallPass-macos-universal` artifact retains the app ZIP, real desktop
-screenshot, and preview log; failure captures remain available for diagnosis.
+After packaging, CI launches the actual app with `--demo` and exercises mouse
+selection, text/draft undo, editing, review, JSON export/import, preview apply,
+search focus, resizing, fullscreen, inspector, and Window-menu/Dock reopening.
+This requires Accessibility access and never applies system network settings.
+Both debug and release tests run; the latter catches optimized C-buffer
+lifetime errors that a debug build can hide.
+
+CI also builds the documented host-architecture app, captures light/dark
+appearances, and restores the runner's original appearance. A CI-owned private
+recovery fixture checks unchanged legacy values and close/quit cancellation in
+a normal launch. Its bytes are checked afterward; no privileged load or apply
+is invoked. Existing recovery files are never overwritten by fixture setup.
+
+The `HallPass-macos-universal` artifact retains the app ZIP, window/desktop,
+host-build, dark, and recovery screenshots, plus launch logs. Failure captures
+remain available for diagnosis. Window capture uses `scripts/window-number.swift`
+to select the app's largest visible normal window.
 
 `workflow_dispatch` is enabled. It was added family-wide when GitHub throttled
 webhook delivery during an Actions incident and `pull_request` events stopped
