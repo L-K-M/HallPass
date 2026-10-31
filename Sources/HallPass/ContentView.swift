@@ -171,6 +171,7 @@ struct ContentView: View {
             }
             .width(min: 110, ideal: 125)
         }
+        .focusable()
         .focused($tableFocused)
         .disabled(model.busy)
         .accessibilityLabel("IP-Bereiche für \(interface.title)")
