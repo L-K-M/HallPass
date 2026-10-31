@@ -190,7 +190,7 @@ struct ContentView: View {
             model.remove(selection, interface: interface)
         }
         .onCopyCommand(perform: selectedRows.isEmpty ? nil : {
-            selectedRows.map { NSItemProvider(object: $0.notation as NSString) }
+            [NSItemProvider(object: selectedRows.map(\.notation).joined(separator: "\n") as NSString)]
         })
         .onKeyPress(.return) {
             guard available, model.canEdit, tableFocused, !searchFocused, selectedRows.count == 1 else { return .ignored }
