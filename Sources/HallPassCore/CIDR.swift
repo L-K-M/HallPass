@@ -1,5 +1,9 @@
 import Foundation
+#if os(Linux)
+import Glibc
+#else
 import Darwin
+#endif
 
 /// Represents an IPv4 or IPv6 CIDR network in canonical (compressed) form.
 public struct CIDR: Hashable, Sendable {

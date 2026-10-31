@@ -1,0 +1,45 @@
+name: macOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Building and testing require no repository write access.
+permissions:
+  contents: read
+
+# Superseded PRs may stop; main builds remain useful for bisecting failures.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: macos-26
+    # Bound test or GUI-launch failures rather than consuming a runner indefinitely.
+    timeout-minutes: 15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.0.1.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test formats, preferences, draft undo, and recovery
+        run: swift test
+      - name: Build and verify the app bundle
+        run: ./scripts/build-app.sh
+      - name: Launch the actual app with sample data
+        run: |
+          open dist/HallPass.app --args --demo
+          sleep 5
+          pgrep -x HallPass
+          screencapture -x dist/HallPass-preview.png
+          osascript -e 'tell application "HallPass" to quit'
+      - name: Archive the app
+        run: ditto -c -k --sequesterRsrc --keepParent dist/HallPass.app dist/HallPass-macos-arm64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HallPass-macos-arm64
+          path: |
+            dist/HallPass-macos-arm64.zip
+            dist/HallPass-preview.png
