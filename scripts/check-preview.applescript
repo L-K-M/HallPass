@@ -262,7 +262,7 @@ on clickRange(rowIndex)
 end clickRange
 
 on postMouseClick(clickX, clickY)
-    set probe to "import CoreGraphics; import Darwin; guard CGPreflightPostEventAccess() else { print(\"Mouse event posting is not authorized\"); exit(1) }; let point = CGPoint(x: " & clickX & ", y: " & clickY & "); guard let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: point, mouseButton: .left), let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: point, mouseButton: .left) else { exit(1) }; down.setIntegerValueField(.mouseEventClickState, value: 1); up.setIntegerValueField(.mouseEventClickState, value: 1); down.post(tap: .cghidEventTap); usleep(50000); up.post(tap: .cghidEventTap)"
+    set probe to "import CoreGraphics; import Darwin; guard CGPreflightPostEventAccess(), let source = CGEventSource(stateID: .hidSystemState) else { print(\"Mouse event posting is not authorized\"); exit(1) }; let point = CGPoint(x: " & clickX & ", y: " & clickY & "); guard let down = CGEvent(mouseEventSource: source, mouseType: .leftMouseDown, mouseCursorPosition: point, mouseButton: .left) else { exit(1) }; down.setIntegerValueField(.mouseEventClickState, value: 1); down.post(tap: .cghidEventTap); usleep(100000); guard let up = CGEvent(mouseEventSource: source, mouseType: .leftMouseUp, mouseCursorPosition: point, mouseButton: .left) else { exit(1) }; up.setIntegerValueField(.mouseEventClickState, value: 1); up.post(tap: .cghidEventTap); usleep(100000)"
     do shell script "/usr/bin/xcrun swift -e " & quoted form of probe
 end postMouseClick
 
