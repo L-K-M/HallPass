@@ -25,6 +25,8 @@ struct NetworkRow: Identifiable {
 }
 
 struct ContentView: View {
+    private static let minimumDetailWidth: CGFloat = 430
+
     @Bindable var model: HallPassModel
     @Environment(\.undoManager) private var windowUndoManager
     @SceneStorage("selectedInterface") private var interfaceName = NetworkInterface.wifi.rawValue
@@ -65,6 +67,7 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 280)
         } detail: {
             detail
+                .navigationSplitViewColumnWidth(min: Self.minimumDetailWidth, ideal: 520)
                 .navigationTitle("HallPass")
                 .navigationSubtitle(interface.title)
                 .toolbar { toolbar }
@@ -74,7 +77,7 @@ struct ContentView: View {
             NetworkInspector(rows: selectedRows, interface: interface, canEdit: model.canEdit && available) {
                 perform(.edit)
             }
-            .inspectorColumnWidth(min: NetworkInspector.minimumWidth, ideal: 270, max: 360)
+            .inspectorColumnWidth(min: NetworkInspector.minimumWidth, ideal: NetworkInspector.idealWidth, max: NetworkInspector.maximumWidth)
         }
         .focusedSceneValue(\.hallPassActions, WorkspaceActions(
             model: model, available: available, selectionCount: selectedRows.count,
@@ -150,7 +153,7 @@ struct ContentView: View {
             statusBar
         }
         // Bound wrapping before the split view measures its minimum size.
-        .frame(minWidth: 430, maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minWidth: Self.minimumDetailWidth, maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var networkTable: some View {
