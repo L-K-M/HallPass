@@ -78,6 +78,10 @@ struct ContentView: View {
             }
             .inspectorColumnWidth(min: 240, ideal: 270, max: 360)
         }
+        .focusedSceneValue(\.hallPassActions, WorkspaceActions(
+            model: model, available: available, selectionCount: selectedRows.count,
+            tableFocused: tableFocused, showsInspector: showsInspector, interface: interface, perform: perform
+        ))
     }
 
     var body: some View {

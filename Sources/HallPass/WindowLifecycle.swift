@@ -106,7 +106,6 @@ struct WindowConnection: NSViewRepresentable {
             guard self.window !== window else { return }
             self.window = window
             originalDelegate = window.delegate
-            window.delegate = self
             window.isReleasedWhenClosed = false
             window.tabbingMode = .disallowed
             WindowLifecycle.shared.model = model
