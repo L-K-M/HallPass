@@ -103,7 +103,6 @@ struct WindowConnection: NSViewRepresentable {
         // Objective-C introspection only reads this weak reference; connection stays on the main actor.
         nonisolated(unsafe) private weak var originalDelegate: (any NSWindowDelegate)?
         private weak var window: NSWindow?
-        private var mouseMonitor: Any?
 
         init(model: HallPassModel, connected: @escaping (NSWindow) -> Void) {
             self.model = model
@@ -120,30 +119,6 @@ struct WindowConnection: NSViewRepresentable {
             WindowLifecycle.shared.model = model
             WindowLifecycle.shared.window = window
             DispatchQueue.main.async { self.connected(window) }
-            if CommandLine.arguments.contains("--diagnose-clicks") {
-                mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { event in
-                    guard let window = event.window, let content = window.contentView else { return event }
-                    let point = content.convert(event.locationInWindow, from: nil)
-                    let hit = content.hitTest(point)
-                    let message = "Mouse event: type=\(event.type.rawValue) time=\(event.timestamp) count=\(event.clickCount) number=\(window.windowNumber) window=\(event.locationInWindow) content=\(point) hit=\(String(describing: hit))\n"
-                    FileHandle.standardOutput.write(Data(message.utf8))
-                    var view = hit
-                    while let current = view {
-                        if let table = current as? NSTableView {
-                            let tablePoint = table.convert(event.locationInWindow, from: nil)
-                            let row = table.row(at: tablePoint)
-                            let shouldSelect = table.delegate?.tableView?(table, shouldSelectRow: row)
-                            FileHandle.standardOutput.write(Data("Native table point: \(tablePoint), row=\(row), frame=\(table.frame), key=\(window.isKeyWindow), active=\(NSApp.isActive), multiple=\(table.allowsMultipleSelection), shouldSelect=\(String(describing: shouldSelect))\n".utf8))
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                FileHandle.standardOutput.write(Data("Native selected rows: \(table.selectedRowIndexes), clicked=\(table.clickedRow), responder=\(String(describing: window.firstResponder))\n".utf8))
-                            }
-                            break
-                        }
-                        view = current.superview
-                    }
-                    return event
-                }
-            }
         }
 
         func windowShouldClose(_ sender: NSWindow) -> Bool {

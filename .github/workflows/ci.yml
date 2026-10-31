@@ -65,7 +65,7 @@ jobs:
       - name: Launch the actual app with sample data
         id: preview
         run: |
-          open --stdout "$PWD/dist/HallPass-preview.log" --stderr "$PWD/dist/HallPass-preview.log" dist/HallPass.app --args --demo --diagnose-clicks
+          open --stdout "$PWD/dist/HallPass-preview.log" --stderr "$PWD/dist/HallPass-preview.log" dist/HallPass.app --args --demo
           sleep 20
           pgrep -x HallPass
 

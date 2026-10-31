@@ -85,11 +85,8 @@ struct ReviewView: View {
             List {
                 ForEach(model.changes) { change in
                     Section {
-                        ForEach(Array(change.added.enumerated()), id: \.offset) { _, network in
-                            changeRow(network, kind: .addition)
-                        }
-                        ForEach(Array(change.removed.enumerated()), id: \.offset) { _, network in
-                            changeRow(network, kind: .removal)
+                        ForEach(entries(for: change)) { entry in
+                            changeRow(entry.network, kind: entry.kind)
                         }
                         if change.added.isEmpty, change.removed.isEmpty {
                             Text(structuralChange(change.interface)).foregroundStyle(.secondary)
@@ -122,10 +119,25 @@ struct ReviewView: View {
         .frame(width: 560, height: 500)
     }
 
-    private enum ChangeKind {
+    private enum ChangeKind: String {
         case addition, removal
         var title: String { self == .addition ? "Hinzufügen" : "Entfernen" }
         var symbol: String { self == .addition ? "plus.circle" : "minus.circle" }
+    }
+
+    private struct ReviewEntry: Identifiable {
+        let id: String
+        let network: String
+        let kind: ChangeKind
+    }
+
+    private func entries(for change: InterfaceChange) -> [ReviewEntry] {
+        // List flattens row identities across additions, removals, and interfaces.
+        [(ChangeKind.addition, change.added), (.removal, change.removed)].flatMap { kind, networks in
+            networks.enumerated().map { index, network in
+                ReviewEntry(id: "\(change.interface.rawValue)/\(kind.rawValue)/\(index)", network: network, kind: kind)
+            }
+        }
     }
 
     private func changeRow(_ network: String, kind: ChangeKind) -> some View {
