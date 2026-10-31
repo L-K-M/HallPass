@@ -76,7 +76,7 @@ struct ContentView: View {
             NetworkInspector(rows: selectedRows, interface: interface, canEdit: model.canEdit && available) {
                 perform(.edit)
             }
-            .inspectorColumnWidth(min: 240, ideal: 270, max: 360)
+            .inspectorColumnWidth(min: NetworkInspector.minimumWidth, ideal: 270, max: 360)
         }
         .focusedSceneValue(\.hallPassActions, WorkspaceActions(
             model: model, available: available, selectionCount: selectedRows.count,
@@ -149,7 +149,6 @@ struct ContentView: View {
                 welcome
             }
         }
-        .frame(minWidth: 430, maxWidth: .infinity, maxHeight: .infinity)
         .safeAreaInset(edge: .top, spacing: 0) { notices }
         .safeAreaInset(edge: .bottom, spacing: 0) { statusBar }
         .dropDestination(for: URL.self) { urls, _ in
@@ -164,6 +163,8 @@ struct ContentView: View {
                     .padding(4).allowsHitTesting(false)
             }
         }
+        // Bound wrapping before the split view measures its minimum size.
+        .frame(minWidth: 430, maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var networkTable: some View {

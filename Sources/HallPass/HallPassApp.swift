@@ -14,7 +14,6 @@ struct HallPassApp: App {
         .defaultSize(width: 980, height: 640)
         .windowResizability(.contentMinSize)
         .windowToolbarStyle(.unified)
-        .keyboardShortcut("0")
         .commands { HallPassCommands() }
     }
 }

@@ -7,6 +7,8 @@ enum HallPassHelp {
 }
 
 struct NetworkInspector: View {
+    static let minimumWidth: CGFloat = 240
+
     let rows: [NetworkRow]
     let interface: NetworkInterface
     let canEdit: Bool
@@ -62,6 +64,7 @@ struct NetworkInspector: View {
                 .formStyle(.grouped)
             }
         }
+        .frame(minWidth: Self.minimumWidth)
         .accessibilityLabel("Informationen zur Auswahl")
     }
 }

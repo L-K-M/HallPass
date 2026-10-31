@@ -6,10 +6,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        guard !flag, let window = WindowLifecycle.shared.window else { return true }
-        window.makeKeyAndOrderFront(nil)
-        sender.activate()
-        return false
+        guard !flag else { return true }
+        return !WindowLifecycle.shared.showWindow()
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -31,11 +29,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 @MainActor
-private final class WindowLifecycle {
+final class WindowLifecycle {
     static let shared = WindowLifecycle()
-    weak var model: HallPassModel?
-    weak var window: NSWindow?
+    fileprivate weak var model: HallPassModel?
+    fileprivate var window: NSWindow?
     private var confirming = false
+
+    private init() { }
+
+    func showWindow() -> Bool {
+        guard let window else { return false }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        return true
+    }
 
     func explainBusy() {
         model?.error = "HallPass arbeitet noch. Schließe zuerst den Administrator-Dialog und warte, bis der Vorgang abgeschlossen ist."

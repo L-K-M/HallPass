@@ -35,6 +35,7 @@ extension FocusedValues {
 
 struct HallPassCommands: Commands {
     @FocusedValue(\.hallPassActions) private var actions
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -80,6 +81,13 @@ struct HallPassCommands: Commands {
         }
 
         SidebarCommands()
+
+        CommandGroup(replacing: .singleWindowList) {
+            Button("HallPass") {
+                if !WindowLifecycle.shared.showWindow() { openWindow(id: "main") }
+            }
+            .keyboardShortcut("0")
+        }
 
         CommandGroup(after: .toolbar) {
             Toggle("Informationen", isOn: Binding(
