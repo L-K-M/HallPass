@@ -171,49 +171,7 @@ struct ContentView: View {
             }
             .width(min: 110, ideal: 125)
         }
-        .focused($tableFocused)
         .disabled(model.busy)
-        .searchable(text: $searchText, placement: .toolbar, prompt: "IP-Bereiche suchen")
-        .searchFocused($searchFocused)
-        .onDeleteCommand {
-            guard model.canEdit, available, tableFocused, !searchFocused else { return }
-            model.remove(selection, interface: interface)
-        }
-        .onCopyCommand(perform: selectedRows.isEmpty ? nil : {
-            [NSItemProvider(object: selectedRows.map(\.notation).joined(separator: "\n") as NSString)]
-        })
-        .onKeyPress(.return) {
-            guard available, model.canEdit, tableFocused, !searchFocused, selectedRows.count == 1 else { return .ignored }
-            perform(.edit)
-            return .handled
-        }
-        .contextMenu(forSelectionType: Int.self) { items in
-            Button("IP-Bereich bearbeiten…") { edit(items) }
-                .disabled(items.count != 1 || !model.canEdit)
-            Button("Kopieren") { copy(items) }.disabled(items.isEmpty)
-            Divider()
-            Button("Entfernen", role: .destructive) { model.remove(items, interface: interface) }
-                .disabled(items.isEmpty || !model.canEdit)
-        } primaryAction: { items in
-            edit(items)
-        }
-        .overlay {
-            if visibleRows.isEmpty {
-                ContentUnavailableView {
-                    Label(searchText.isEmpty ? "Keine Freigaben" : "Keine Treffer", systemImage: searchText.isEmpty ? interface.symbol : "magnifyingglass")
-                } description: {
-                    Text(searchText.isEmpty
-                         ? "Für \(interface.title) gelten die regulären lokalen Netzwerkberechtigungen."
-                         : "Kein IP-Bereich entspricht „\(searchText)“.")
-                } actions: {
-                    if searchText.isEmpty {
-                        Button("Netzbereich hinzufügen…") { perform(.add) }.disabled(!model.canEdit)
-                    } else {
-                        Button("Suche löschen") { searchText = "" }
-                    }
-                }
-            }
-        }
         .accessibilityLabel("IP-Bereiche für \(interface.title)")
     }
 
