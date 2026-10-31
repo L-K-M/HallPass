@@ -88,20 +88,19 @@ tell application "System Events"
         if exists sheet 1 of window 1 then error "Search changed the draft."
 
         log "Select, copy, remove, and edit table rows"
-        set rangeTable to my networkTable()
         log "Click the first network row"
-        click row 1 of rangeTable
+        my clickRange(1)
         keystroke "a" using command down
         keystroke "c" using command down
         delay pollDelay
         my assertCopiedRanges()
         key code deleteKey
         delay pollDelay
-        if (count rows of rangeTable) is not 0 then error "Delete did not remove the selected ranges."
+        if my numberOfRanges() is not 0 then error "Delete did not remove the selected ranges."
         keystroke "z" using command down
         delay pollDelay
-        if (count rows of rangeTable) is not 2 then error "Undo did not restore the selected ranges."
-        click row 1 of rangeTable
+        if my numberOfRanges() is not 2 then error "Undo did not restore the selected ranges."
+        my clickRange(1)
         key code returnKey using command down
         my waitForSheet()
         keystroke "a" using command down
@@ -155,8 +154,7 @@ tell application "System Events"
         delay sheetSettleDelay
         key code returnKey
         my waitForNoSheet()
-        set rangeTable to my networkTable()
-        if (count rows of rangeTable) is not 2 then error "Backup round-trip did not restore both ranges."
+        if my numberOfRanges() is not 2 then error "Backup round-trip did not restore both ranges."
         my removeBackupFixture(backupFile)
 
         log "Apply preview changes and reload sample data"
@@ -171,8 +169,7 @@ tell application "System Events"
         my waitForNoSheet()
         keystroke "l" using command down
         delay sheetSettleDelay
-        set rangeTable to my networkTable()
-        if (count rows of rangeTable) is not 2 then error "Reload did not restore the sample configuration."
+        if my numberOfRanges() is not 2 then error "Reload did not restore the sample configuration."
 
         log "Resize and enter fullscreen"
         set size of window 1 to {720, 480}
@@ -183,7 +180,7 @@ tell application "System Events"
         keystroke "f" using {command down, control down}
         my waitForWindowed()
 
-        click row 1 of rangeTable
+        my clickRange(1)
         keystroke "i" using {command down, option down}
         delay sheetSettleDelay
         keystroke "i" using {command down, option down}
@@ -202,8 +199,7 @@ end tell
 
 my waitForWindow()
 tell application "System Events" to tell process "HallPass"
-    set rangeTable to my networkTable()
-    click row 1 of rangeTable
+    my clickRange(1)
     keystroke "i" using {command down, option down}
 end tell
 delay sheetSettleDelay
@@ -237,6 +233,25 @@ on networkTable()
     end repeat
     error "The network table is missing."
 end networkTable
+
+on numberOfRanges()
+    set rangeTable to my networkTable()
+    tell application "System Events"
+        return count of (get value of attribute "AXRows" of rangeTable)
+    end tell
+end numberOfRanges
+
+on clickRange(rowIndex)
+    set rangeTable to my networkTable()
+    tell application "System Events"
+        set tableRows to get value of attribute "AXRows" of rangeTable
+        set targetRow to item rowIndex of tableRows
+        set rowPosition to get position of targetRow
+        set rowSize to get size of targetRow
+        click at {(item 1 of rowPosition) + (item 1 of rowSize) / 2, (item 2 of rowPosition) + (item 2 of rowSize) / 2}
+    end tell
+    delay pollDelay
+end clickRange
 
 on assertCopiedRanges()
     if paragraphs of (the clipboard as text) is not {"169.254.0.0/16", "192.168.1.0/24"} then error "Copy did not include both selected ranges."
