@@ -26,6 +26,7 @@ struct NetworkRow: Identifiable {
 
 struct ContentView: View {
     @Bindable var model: HallPassModel
+    @Environment(\.undoManager) private var windowUndoManager
     @SceneStorage("selectedInterface") private var interfaceName = NetworkInterface.wifi.rawValue
     @SceneStorage("showsInspector") private var showsInspector = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
@@ -60,7 +61,7 @@ struct ContentView: View {
 
     private var selectedRows: [NetworkRow] { visibleRows.filter { selection.contains($0.id) } }
 
-    var body: some View {
+    private var windowContents: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
                 .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 280)
@@ -77,13 +78,17 @@ struct ContentView: View {
             }
             .inspectorColumnWidth(min: 240, ideal: 270, max: 360)
         }
-        .environment(\.undoManager, model.canEdit ? model.undoManager : nil)
         .focusedSceneValue(\.hallPassActions, WorkspaceActions(
             model: model, available: available, selectionCount: selectedRows.count,
             tableFocused: tableFocused, showsInspector: showsInspector, interface: interface, perform: perform
         ))
+    }
+
+    var body: some View {
+        windowContents
         .background(WindowConnection(model: model) { window = $0 }.frame(width: 0, height: 0))
         .task { model.restoreSession() }
+        .onChange(of: windowUndoManager, initial: true) { model.useUndoManager(windowUndoManager) }
         .sheet(item: $sheet) { request in
             switch request {
             case .add:
@@ -274,6 +279,10 @@ struct ContentView: View {
             if model.isDemo {
                 banner("Vorschau", symbol: "eye", text: "Beispieldaten. Die Systemeinstellungen bleiben unverändert.") {
                     Button("Vorschau beenden") { perform(.preview) }.disabled(!available)
+                }
+            } else if model.recoveryBlocked {
+                banner("Entwurfsdatei geschützt", symbol: "exclamationmark.triangle", text: "Prüfe die Zugriffsrechte im HallPass-Ordner und starte HallPass erneut, bevor du Änderungen vornimmst.") {
+                    EmptyView()
                 }
             } else if model.requiresReload {
                 banner("Systemzustand prüfen", symbol: "exclamationmark.triangle", text: "Lade die Konfiguration neu. Der Entwurf und das automatische Backup bleiben bis dahin erhalten.") {

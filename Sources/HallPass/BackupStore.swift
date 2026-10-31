@@ -33,6 +33,13 @@ struct BackupStore {
         try writePrivate(recovery.encoded(), to: recoveryURL())
     }
 
+    func preserveFailedRecovery() throws -> URL {
+        let original = try recoveryURL()
+        let preserved = try backupsDirectory().appendingPathComponent("HallPass-Draft-\(UUID().uuidString).json")
+        try FileManager.default.moveItem(at: original, to: preserved)
+        return preserved
+    }
+
     func removeRecovery() throws {
         let url = try recoveryURL()
         guard FileManager.default.fileExists(atPath: url.path) else { return }

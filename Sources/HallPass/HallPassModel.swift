@@ -18,12 +18,13 @@ final class HallPassModel {
     private(set) var mode: SessionMode
     private(set) var needsRestart = false
     private(set) var recoveredDraft = false
+    private(set) var recoveryBlocked = false
     private(set) var requiresReload = false
     private(set) var notice: String?
     private(set) var lastBackup: URL?
     var error: String?
 
-    @ObservationIgnored let undoManager = UndoManager()
+    @ObservationIgnored private(set) var undoManager = UndoManager()
     private let service: any PreferencesServicing
     private let backups: BackupStore
     private var restoredSession = false
@@ -48,7 +49,7 @@ final class HallPassModel {
     var isLoaded: Bool { snapshot != nil }
     var busy: Bool { activity != .idle }
     var isDirty: Bool { snapshot.map { $0.configuration != draft } ?? false }
-    var canEdit: Bool { isLoaded && !busy && !requiresReload }
+    var canEdit: Bool { isLoaded && !busy && !requiresReload && (isDemo || !recoveryBlocked) }
     var canReview: Bool { canEdit && isDirty && validationMessage == nil }
     var changes: [InterfaceChange] { draft.changes(from: snapshot?.configuration ?? .init()) }
 
@@ -59,6 +60,12 @@ final class HallPassModel {
         } catch {
             return error.localizedDescription
         }
+    }
+
+    func useUndoManager(_ manager: UndoManager?) {
+        guard let manager, manager !== undoManager else { return }
+        undoManager.removeAllActions()
+        undoManager = manager
     }
 
     func restoreSession() {
@@ -75,7 +82,14 @@ final class HallPassModel {
             draft = recovery.draft
             recoveredDraft = true
         } catch {
-            self.error = "Der Entwurf konnte nicht wiederhergestellt werden. Die Datei bleibt in „Application Support/HallPass/Draft.json“ erhalten.\n\n\(error.localizedDescription)"
+            let failure = error.localizedDescription
+            do {
+                let preserved = try backups.preserveFailedRecovery()
+                self.error = "Der Entwurf konnte nicht wiederhergestellt werden. Das Original liegt unverändert im Backupordner als „\(preserved.lastPathComponent)“.\n\n\(failure)"
+            } catch {
+                recoveryBlocked = true
+                self.error = "Die ursprüngliche Entwurfsdatei bleibt unverändert. Bearbeiten ist gesperrt, weil sie nicht gesichert werden konnte. Prüfe die Zugriffsrechte im HallPass-Ordner und starte HallPass erneut.\n\n\(error.localizedDescription)"
+            }
         }
     }
 
@@ -147,7 +161,7 @@ final class HallPassModel {
     func discardForClosing() -> Bool {
         guard !busy, let snapshot else { return false }
         do {
-            if !isDemo { try backups.removeRecovery() }
+            if !isDemo, !recoveryBlocked { try backups.removeRecovery() }
         } catch {
             self.error = "Der wiederherstellbare Entwurf konnte nicht entfernt werden.\n\n\(error.localizedDescription)"
             return false
@@ -255,7 +269,7 @@ final class HallPassModel {
     }
 
     private func persistRecovery() {
-        guard !isDemo, let snapshot else { return }
+        guard !isDemo, !recoveryBlocked, let snapshot else { return }
         do {
             if isDirty {
                 try backups.saveRecovery(DraftRecovery(baseline: snapshot, draft: draft))
