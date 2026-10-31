@@ -90,6 +90,13 @@ struct HallPassCommands: Commands {
         }
 
         CommandGroup(after: .toolbar) {
+            Toggle("Vollbild", isOn: Binding(
+                get: { NSApp.keyWindow?.styleMask.contains(.fullScreen) ?? false },
+                set: { _ in NSApp.sendAction(#selector(NSWindow.toggleFullScreen(_:)), to: nil, from: nil) }
+            ))
+            .keyboardShortcut("f", modifiers: [.command, .control])
+            .disabled(actions?.available != true)
+            Divider()
             Toggle("Informationen", isOn: Binding(
                 get: { actions?.showsInspector ?? false }, set: { _ in actions?.perform(.inspector) }
             ))

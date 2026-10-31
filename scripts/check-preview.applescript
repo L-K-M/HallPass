@@ -177,6 +177,7 @@ tell application "System Events"
         set size of window 1 to {720, 480}
         delay sheetSettleDelay
         set size of window 1 to {980, 640}
+        delay sheetSettleDelay
         keystroke "f" using {command down, control down}
         my waitForFullScreen()
         keystroke "f" using {command down, control down}

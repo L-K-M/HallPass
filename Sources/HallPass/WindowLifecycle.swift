@@ -116,6 +116,8 @@ struct WindowConnection: NSViewRepresentable {
             window.delegate = self
             window.isReleasedWhenClosed = false
             window.tabbingMode = .disallowed
+            window.collectionBehavior.subtract([.fullScreenNone, .fullScreenAuxiliary])
+            window.collectionBehavior.insert(.fullScreenPrimary)
             WindowLifecycle.shared.model = model
             WindowLifecycle.shared.window = window
             DispatchQueue.main.async { self.connected(window) }
