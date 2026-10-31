@@ -69,6 +69,7 @@ tell application "System Events"
         -- Delete in search must edit the query, not the configuration.
         log "Edit the search query"
         keystroke "f" using command down
+        my waitForSearchFocus()
         keystroke "169.254"
         keystroke "a" using command down
         key code deleteKey
@@ -78,8 +79,9 @@ tell application "System Events"
         if exists sheet 1 of window 1 then error "Search changed the draft."
 
         keystroke "i" using {command down, option down}
-        delay pollDelay
+        delay sheetSettleDelay
         keystroke "i" using {command down, option down}
+        delay sheetSettleDelay
         log "Close and reopen the clean window"
         keystroke "w" using command down
         delay pollDelay
@@ -121,3 +123,18 @@ on waitForNoSheet()
     end repeat
     error "The sheet did not close."
 end waitForNoSheet
+
+on waitForSearchFocus()
+    repeat pollCount times
+        tell application "System Events" to tell process "HallPass"
+            set controls to get entire contents of toolbar 1 of window 1
+            repeat with uiElement in controls
+                if (get role of uiElement) is "AXTextField" then
+                    if (get focused of uiElement) then return
+                end if
+            end repeat
+        end tell
+        delay pollDelay
+    end repeat
+    error "Search did not receive keyboard focus."
+end waitForSearchFocus

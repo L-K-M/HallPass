@@ -112,6 +112,18 @@ struct WindowConnection: NSViewRepresentable {
             WindowLifecycle.shared.model = model
             WindowLifecycle.shared.window = window
             DispatchQueue.main.async { self.connected(window) }
+            if CommandLine.arguments.contains("--diagnose-layout") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    if let view = window.contentView { self.dumpLayout(view) }
+                }
+            }
+        }
+
+        private func dumpLayout(_ view: NSView, depth: Int = 0) {
+            let maximumDepth = 16
+            guard depth < maximumDepth else { return }
+            print("\(String(repeating: " ", count: depth * 2))\(type(of: view)) frame=\(view.frame) bounds=\(view.bounds) hidden=\(view.isHiddenOrHasHiddenAncestor) alpha=\(view.alphaValue) layer=\(String(describing: view.layer?.opacity))")
+            for child in view.subviews { dumpLayout(child, depth: depth + 1) }
         }
 
         func windowShouldClose(_ sender: NSWindow) -> Bool {

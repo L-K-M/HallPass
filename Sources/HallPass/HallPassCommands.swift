@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import HallPassCore
 
@@ -59,13 +60,18 @@ struct HallPassCommands: Commands {
                 .disabled(actions?.canEdit != true || actions?.model.draft == NetworkConfiguration())
         }
 
-        CommandGroup(replacing: .saveItem) { }
+        CommandGroup(replacing: .saveItem) {
+            Button("Schließen") {
+                NSApp.sendAction(#selector(NSWindow.performClose(_:)), to: nil, from: nil)
+            }
+            .keyboardShortcut("w").disabled(NSApp.keyWindow == nil || actions?.model.busy == true)
+        }
 
         CommandGroup(after: .pasteboard) {
             Button("IP-Bereich bearbeiten…") { actions?.perform(.edit) }
                 .keyboardShortcut(.return, modifiers: .command).disabled(actions?.canEditSelection != true)
             Button("Entfernen") { actions?.perform(.remove) }
-                .keyboardShortcut(.delete, modifiers: []).disabled(actions?.canRemove != true)
+                .disabled(actions?.canRemove != true)
         }
 
         CommandGroup(after: .textEditing) {

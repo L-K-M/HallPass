@@ -80,12 +80,13 @@ struct ContentView: View {
         }
         .focusedSceneValue(\.hallPassActions, WorkspaceActions(
             model: model, available: available, selectionCount: selectedRows.count,
-            tableFocused: tableFocused, showsInspector: showsInspector, interface: interface, perform: perform
+            tableFocused: tableFocused && !searchFocused, showsInspector: showsInspector, interface: interface, perform: perform
         ))
     }
 
     var body: some View {
         windowContents
+        .background(WindowConnection(model: model) { window = $0 }.frame(width: 0, height: 0))
         .task { model.restoreSession() }
         .onChange(of: windowUndoManager, initial: true) { model.useUndoManager(windowUndoManager) }
         .sheet(item: $sheet) { request in
@@ -184,14 +185,14 @@ struct ContentView: View {
         .searchable(text: $searchText, placement: .toolbar, prompt: "IP-Bereiche suchen")
         .searchFocused($searchFocused)
         .onDeleteCommand {
-            guard model.canEdit, available, tableFocused else { return }
+            guard model.canEdit, available, tableFocused, !searchFocused else { return }
             model.remove(selection, interface: interface)
         }
         .onCopyCommand(perform: selectedRows.isEmpty ? nil : {
             selectedRows.map { NSItemProvider(object: $0.notation as NSString) }
         })
         .onKeyPress(.return) {
-            guard available, model.canEdit, selectedRows.count == 1 else { return .ignored }
+            guard available, model.canEdit, tableFocused, !searchFocused, selectedRows.count == 1 else { return .ignored }
             perform(.edit)
             return .handled
         }
@@ -357,6 +358,7 @@ struct ContentView: View {
         case .edit:
             edit(selection)
         case .remove:
+            guard tableFocused, !searchFocused else { return }
             model.remove(selection, interface: interface)
         case .review:
             guard model.canReview else { return }
@@ -389,6 +391,7 @@ struct ContentView: View {
         case .inspector:
             showsInspector.toggle()
         case .search:
+            tableFocused = false
             searchFocused = true
         case .wifi:
             interfaceName = NetworkInterface.wifi.rawValue

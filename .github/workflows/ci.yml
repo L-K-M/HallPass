@@ -65,7 +65,7 @@ jobs:
       - name: Launch the actual app with sample data
         id: preview
         run: |
-          open --stdout "$PWD/dist/HallPass-preview.log" --stderr "$PWD/dist/HallPass-preview.log" dist/HallPass.app --args --demo
+          open --stdout "$PWD/dist/HallPass-preview.log" --stderr "$PWD/dist/HallPass-preview.log" dist/HallPass.app --args --demo --diagnose-layout
           sleep 20
           pgrep -x HallPass
 
@@ -94,6 +94,17 @@ jobs:
         if: always() && steps.preview.outcome == 'success'
         run: swift test -c release
 
+      - name: Compare the documented host-architecture build
+        if: always() && steps.preview.outcome == 'success'
+        run: |
+          HALLPASS_OUTPUT_DIR="$PWD/dist/host" ./scripts/build-app.sh
+          open --stdout "$PWD/dist/HallPass-host.log" --stderr "$PWD/dist/HallPass-host.log" dist/host/HallPass.app --args --demo --diagnose-layout
+          HOST_PID="$(pgrep -x HallPass)"
+          trap 'kill "$HOST_PID" 2>/dev/null || true' EXIT
+          sleep 10
+          WINDOW_NUMBER="$(swift scripts/window-number.swift "$HOST_PID")"
+          screencapture -x -o -l "$WINDOW_NUMBER" dist/HallPass-host.png
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -103,3 +114,5 @@ jobs:
             dist/HallPass-preview.png
             dist/HallPass-window.png
             dist/HallPass-preview.log
+            dist/HallPass-host.png
+            dist/HallPass-host.log
