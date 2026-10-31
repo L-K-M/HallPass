@@ -4,7 +4,7 @@
 <dict>
     <key>CFBundleName</key><string>HallPass</string>
     <key>CFBundleDisplayName</key><string>HallPass</string>
-    <key>CFBundleIdentifier</key><string>app.hallpass.mac</string>
+    <key>CFBundleIdentifier</key><string>ch.lkmc.HallPass</string>
     <key>CFBundleExecutable</key><string>HallPass</string>
     <key>CFBundleIconFile</key><string>HallPass</string>
     <key>CFBundlePackageType</key><string>APPL</string>
@@ -13,6 +13,6 @@
     <key>LSMinimumSystemVersion</key><string>15.5</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>
-    <key>NSHumanReadableCopyright</key><string>HallPass</string>
+    <key>NSHumanReadableCopyright</key><string>Public domain (Unlicense)</string>
 </dict>
 </plist>
