@@ -312,10 +312,12 @@ end pressSheetButton
 on requireSheetText(expectedText)
     tell application "System Events" to tell process "HallPass"
         repeat with uiElement in (get entire contents of sheet 1 of window 1)
-            try
-                if (get description of uiElement) contains expectedText then return
-                if (get value of uiElement as text) contains expectedText then return
-            end try
+            repeat with attributeName in {"AXTitle", "AXDescription", "AXValue", "AXHelp"}
+                try
+                    set accessibleText to get value of attribute (contents of attributeName) of uiElement
+                    if (accessibleText as text) contains expectedText then return
+                end try
+            end repeat
         end repeat
     end tell
     error "The review is missing: " & expectedText
