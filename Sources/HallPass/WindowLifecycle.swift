@@ -131,9 +131,11 @@ struct WindowConnection: NSViewRepresentable {
                     while let current = view {
                         if let table = current as? NSTableView {
                             let tablePoint = table.convert(event.locationInWindow, from: nil)
-                            FileHandle.standardOutput.write(Data("Native table point: \(tablePoint), row=\(table.row(at: tablePoint)), frame=\(table.frame)\n".utf8))
-                            DispatchQueue.main.async {
-                                FileHandle.standardOutput.write(Data("Native selected rows: \(table.selectedRowIndexes)\n".utf8))
+                            let row = table.row(at: tablePoint)
+                            let shouldSelect = table.delegate?.tableView?(table, shouldSelectRow: row)
+                            FileHandle.standardOutput.write(Data("Native table point: \(tablePoint), row=\(row), frame=\(table.frame), key=\(window.isKeyWindow), active=\(NSApp.isActive), multiple=\(table.allowsMultipleSelection), shouldSelect=\(String(describing: shouldSelect))\n".utf8))
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                FileHandle.standardOutput.write(Data("Native selected rows: \(table.selectedRowIndexes), clicked=\(table.clickedRow), responder=\(String(describing: window.firstResponder))\n".utf8))
                             }
                             break
                         }
