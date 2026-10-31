@@ -7,6 +7,7 @@ property tabKey : 48
 property pollCount : 80
 property pollDelay : 0.25
 property sheetSettleDelay : 1
+property rowTextInset : 20
 
 tell application "HallPass" to activate
 my requirePreview()
@@ -253,7 +254,7 @@ on clickRange(rowIndex)
         set rowSize to get size of targetRow
         log rowPosition
         log rowSize
-        set clickX to (item 1 of rowPosition) + (item 1 of rowSize) div 2
+        set clickX to (item 1 of rowPosition) + rowTextInset
         set clickY to (item 2 of rowPosition) + (item 2 of rowSize) div 2
         log {clickX, clickY}
         my postMouseClick(clickX, clickY)

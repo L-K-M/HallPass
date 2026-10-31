@@ -95,6 +95,7 @@ jobs:
         run: swift test -c release
 
       - name: Check the documented host-architecture build
+        id: host
         if: always() && steps.preview.outcome == 'success'
         run: |
           HALLPASS_OUTPUT_DIR="$PWD/dist/host" ./scripts/build-app.sh
@@ -114,6 +115,7 @@ jobs:
           screencapture -x -o -l "$WINDOW_NUMBER" dist/HallPass-dark.png
 
       - name: Restore a private fixture in the running app
+        if: always() && steps.host.outcome == 'success'
         run: |
           RECOVERY_DIGEST="$(python3 - <<'PY'
           import hashlib, json, os, plistlib
