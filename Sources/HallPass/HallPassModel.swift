@@ -24,7 +24,7 @@ final class HallPassModel {
     var error: String?
 
     @ObservationIgnored let undoManager = UndoManager()
-    private let service = SystemPreferencesService()
+    private let service: any PreferencesServicing
     private let backups: BackupStore
     private var restoredSession = false
 
@@ -34,9 +34,10 @@ final class HallPassModel {
         static let bootTolerance: TimeInterval = 5
     }
 
-    init(mode: SessionMode = .system, backups: BackupStore = .init()) {
+    init(mode: SessionMode = .system, backups: BackupStore = .init(), service: any PreferencesServicing = SystemPreferencesService()) {
         self.mode = mode
         self.backups = backups
+        self.service = service
         if mode == .preview {
             draft = .example
             snapshot = try? PreferencesSnapshot(configuration: draft)

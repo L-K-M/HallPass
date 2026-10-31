@@ -16,7 +16,12 @@ enum PreferencesServiceError: LocalizedError {
     }
 }
 
-actor SystemPreferencesService {
+protocol PreferencesServicing: Sendable {
+    func load() async throws -> PreferencesSnapshot
+    func save(_ plan: PreferencePlan) async throws -> PreferencesSnapshot
+}
+
+actor SystemPreferencesService: PreferencesServicing {
     func load() throws -> PreferencesSnapshot {
         let xml = try authorized(PreferencePlan.readCommand, prompt: "HallPass möchte die lokalen Netzfreigaben lesen.")
         return try PreferencesSnapshot(xml: xml)

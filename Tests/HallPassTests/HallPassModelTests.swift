@@ -129,6 +129,66 @@ struct HallPassModelTests {
         #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
     }
 
+    @Test func unsupportedRecoverySurvivesLoadingAndLaterEdits() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let original = Data(#"{"formatVersion":99,"baselineXML":"future format","draft":{}}"#.utf8)
+        try original.write(to: directory.appendingPathComponent("Draft.json"))
+        let model = HallPassModel(backups: BackupStore(root: directory), service: try LoadedPreferences())
+        model.restoreSession()
+        #expect(model.error != nil)
+        await model.load()
+        try model.add("10.0.0.0/8", interfaces: [.wifi])
+        #expect(try files(in: directory).contains { (try? Data(contentsOf: $0)) == original })
+    }
+
+    @Test func unreadableRecoverySurvivesASuccessfulLoad() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let baseline = try PreferencesSnapshot(configuration: .example)
+        let original = try DraftRecovery(baseline: baseline, draft: .init(wifi: ["fe80::/10"])).encoded()
+        let url = directory.appendingPathComponent("Draft.json")
+        try original.write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url.path)
+        let model = HallPassModel(backups: BackupStore(root: directory), service: try LoadedPreferences())
+        model.restoreSession()
+        #expect(model.error != nil)
+        await model.load()
+
+        let retained = try files(in: directory)
+        #expect(retained.count == 1)
+        for file in retained {
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+        }
+        #expect(retained.contains { (try? Data(contentsOf: $0)) == original })
+    }
+
+    @Test func failedPreservationStillProtectsTheOriginalAfterPermissionsReturn() async throws {
+        let directory = try temporaryDirectory()
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let original = Data(#"{"formatVersion":99,"baselineXML":"future format","draft":{}}"#.utf8)
+        try original.write(to: directory.appendingPathComponent("Draft.json"))
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: directory.path)
+        let model = HallPassModel(backups: BackupStore(root: directory), service: try LoadedPreferences())
+        model.restoreSession()
+        #expect(model.error != nil)
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+        await model.load()
+        try model.add("10.0.0.0/8", interfaces: [.wifi])
+        #expect(try files(in: directory).contains { (try? Data(contentsOf: $0)) == original })
+    }
+
+    private func files(in directory: URL) throws -> [URL] {
+        let enumerator = try #require(FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey]))
+        return enumerator.allObjects.compactMap { $0 as? URL }.filter {
+            (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        }
+    }
+
     private func preview() -> HallPassModel {
         let model = HallPassModel(mode: .preview)
         model.undoManager.groupsByEvent = false
@@ -139,5 +199,19 @@ struct HallPassModelTests {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("HallPassModelTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+}
+
+private actor LoadedPreferences: PreferencesServicing {
+    private let snapshot: PreferencesSnapshot
+
+    init() throws {
+        snapshot = try PreferencesSnapshot(configuration: .example)
+    }
+
+    func load() -> PreferencesSnapshot { snapshot }
+
+    func save(_ plan: PreferencePlan) throws -> PreferencesSnapshot {
+        throw PreferencesServiceError.commandFailed("Unexpected test write")
     }
 }
