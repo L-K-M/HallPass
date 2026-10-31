@@ -319,13 +319,34 @@ on pressNativeImport()
     log "Activate the selected file's Import button"
     with timeout of 30 seconds
         tell application "System Events" to tell process "HallPass"
-            set importButton to get button "Importieren" of sheet 1 of window 1
+            set importButton to my findPanelButton(sheet 1 of window 1, "Importieren", 6)
+            if importButton is missing value then error "The native Import button is missing."
             set buttonPosition to get position of importButton
             set buttonSize to get size of importButton
         end tell
     end timeout
     my postMouseClick((item 1 of buttonPosition) + (item 1 of buttonSize) div 2, (item 2 of buttonPosition) + (item 2 of buttonSize) div 2)
 end pressNativeImport
+
+on findPanelButton(panelElement, buttonName, remainingDepth)
+    if remainingDepth is 0 then return missing value
+    tell application "System Events"
+        repeat with uiElement in (get UI elements of panelElement)
+            set elementRole to get role of uiElement
+            if elementRole is "AXButton" then
+                set elementName to get name of uiElement
+                set elementDescription to get description of uiElement
+                log {elementRole, elementName, elementDescription}
+                if elementName is buttonName or elementDescription is buttonName then return uiElement
+            else if elementRole is not in {"AXBrowser", "AXOutline", "AXTable", "AXList", "AXRow", "AXColumn"} then
+                -- Native panels nest their controls; skip potentially huge file listings.
+                set foundButton to my findPanelButton(uiElement, buttonName, remainingDepth - 1)
+                if foundButton is not missing value then return foundButton
+            end if
+        end repeat
+    end tell
+    return missing value
+end findPanelButton
 
 on requireSheetText(expectedText)
     tell application "System Events" to tell process "HallPass"
