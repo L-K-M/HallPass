@@ -251,12 +251,19 @@ on clickRange(rowIndex)
         set rowSize to get size of targetRow
         log rowPosition
         log rowSize
-        click at {(item 1 of rowPosition) + (item 1 of rowSize) / 2, (item 2 of rowPosition) + (item 2 of rowSize) / 2}
+        set clickX to (item 1 of rowPosition) + (item 1 of rowSize) div 2
+        set clickY to (item 2 of rowPosition) + (item 2 of rowSize) div 2
+        my postMouseClick(clickX, clickY)
         delay pollDelay
         if not (get selected of targetRow) then error "The mouse click did not select the network row."
     end tell
     delay pollDelay
 end clickRange
+
+on postMouseClick(clickX, clickY)
+    set probe to "import CoreGraphics; import Darwin; guard CGPreflightPostEventAccess() else { print(\"Mouse event posting is not authorized\"); exit(1) }; let point = CGPoint(x: " & clickX & ", y: " & clickY & "); guard let down = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: point, mouseButton: .left), let up = CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: point, mouseButton: .left) else { exit(1) }; down.setIntegerValueField(.mouseEventClickState, value: 1); up.setIntegerValueField(.mouseEventClickState, value: 1); down.post(tap: .cghidEventTap); usleep(50000); up.post(tap: .cghidEventTap)"
+    do shell script "/usr/bin/xcrun swift -e " & quoted form of probe
+end postMouseClick
 
 on assertCopiedRanges()
     set probe to "import AppKit; let board = NSPasteboard.general; if let text = board.string(forType: .string) { print(text) } else { print(\"Clipboard has no text: \\(String(describing: board.types))\"); exit(1) }"
