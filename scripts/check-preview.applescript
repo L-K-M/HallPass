@@ -13,18 +13,27 @@ tell application "System Events"
         keystroke "n" using command down
         my waitForSheet()
         keystroke "10.0.0.0/8"
+        delay pollDelay
+        set editorContents to get entire contents of sheet 1 of window 1
+        set addressField to missing value
+        repeat with uiElement in editorContents
+            if (get role of uiElement) is "AXTextField" then
+                set addressField to uiElement
+                exit repeat
+            end if
+        end repeat
+        if addressField is missing value then error "The address field is missing."
+        log "Undo and redo native text input"
+        keystroke "z" using command down
+        delay pollDelay
+        if (get value of addressField) is not "" then error "Text undo did not clear the input."
+        keystroke "z" using {command down, shift down}
+        delay pollDelay
+        if (get value of addressField) is not "10.0.0.0/8" then error "Text redo did not restore the input."
         key code returnKey
         my waitForNoSheet()
 
         log "Review additions with CmdS"
-        set windowContents to get entire contents of window 1
-        -- Some accessibility containers do not expose a value.
-        repeat with element in windowContents
-            try
-                set elementProperties to get properties of element
-                log elementProperties
-            end try
-        end repeat
         keystroke "s" using command down
         my waitForSheet()
         key code escapeKey

@@ -76,7 +76,11 @@ jobs:
       - name: Capture the running preview
         if: always() && steps.preview.outcome == 'success'
         run: |
+          PREVIEW_PID="$(pgrep -x HallPass)"
+          trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
           screencapture -x dist/HallPass-preview.png
+          WINDOW_NUMBER="$(swift scripts/window-number.swift "$PREVIEW_PID")"
+          screencapture -x -o -l "$WINDOW_NUMBER" dist/HallPass-window.png
           if test '${{ steps.keyboard.outcome }}' = success; then
             osascript -e 'tell application "HallPass" to quit'
           else
@@ -114,6 +118,7 @@ jobs:
           path: |
             dist/HallPass-macos-universal.zip
             dist/HallPass-preview.png
+            dist/HallPass-window.png
             dist/HallPass-preview.log
             dist/HallPass-reference.png
             dist/HallPass-reference.log

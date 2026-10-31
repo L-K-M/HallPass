@@ -182,6 +182,27 @@ struct HallPassModelTests {
         #expect(try files(in: directory).contains { (try? Data(contentsOf: $0)) == original })
     }
 
+    @Test func endingPreviewRestoresTheUntouchedRealDraft() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = BackupStore(root: directory)
+        let baseline = try PreferencesSnapshot(configuration: .example)
+        let draft = NetworkConfiguration(wifi: ["fe80::/10"], ethernet: [])
+        let original = try DraftRecovery(baseline: baseline, draft: draft).encoded()
+        let url = directory.appendingPathComponent("Draft.json")
+        try original.write(to: url)
+        let model = HallPassModel(mode: .preview, backups: store)
+        model.restoreSession()
+        #expect(model.draft == .example)
+        #expect(try Data(contentsOf: url) == original)
+
+        model.leaveDemo()
+        #expect(model.recoveredDraft)
+        #expect(model.draft == draft)
+        #expect(model.snapshot?.xml == baseline.xml)
+        #expect(try Data(contentsOf: url) == original)
+    }
+
     private func files(in directory: URL) throws -> [URL] {
         let enumerator = try #require(FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isRegularFileKey]))
         return enumerator.allObjects.compactMap { $0 as? URL }.filter {

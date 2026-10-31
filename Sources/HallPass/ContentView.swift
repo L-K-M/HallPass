@@ -77,6 +77,7 @@ struct ContentView: View {
             }
             .inspectorColumnWidth(min: 240, ideal: 270, max: 360)
         }
+        .environment(\.undoManager, model.canEdit ? model.undoManager : nil)
         .focusedSceneValue(\.hallPassActions, WorkspaceActions(
             model: model, available: available, selectionCount: selectedRows.count,
             tableFocused: tableFocused, showsInspector: showsInspector, interface: interface, perform: perform
