@@ -127,24 +127,27 @@ public struct CIDR: Hashable, Sendable {
         let networkBytes = CIDR.applyMask(addressBytes, prefixLength: prefixLength)
 
         // Convert back to canonical string using inet_ntop
+        // The returned C pointer must not outlive the output buffer's borrow.
         let canonicalHost: String
         if isIPv6 {
             var addr6 = in6_addr()
             memcpy(&addr6, networkBytes, MemoryLayout<in6_addr>.size)
             var buffer = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
-            if let ptr = inet_ntop(AF_INET6, &addr6, &buffer, socklen_t(buffer.count)) {
-                canonicalHost = String(cString: ptr)
-            } else {
-                throw CIDRError.invalidFormat("Fehler beim Konvertieren der IPv6-Adresse.")
+            canonicalHost = try buffer.withUnsafeMutableBufferPointer { storage in
+                guard let pointer = inet_ntop(AF_INET6, &addr6, storage.baseAddress, socklen_t(storage.count)) else {
+                    throw CIDRError.invalidFormat("Fehler beim Konvertieren der IPv6-Adresse.")
+                }
+                return String(cString: pointer)
             }
         } else {
             var addr4 = in_addr()
             memcpy(&addr4, networkBytes, MemoryLayout<in_addr>.size)
             var buffer = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
-            if let ptr = inet_ntop(AF_INET, &addr4, &buffer, socklen_t(buffer.count)) {
-                canonicalHost = String(cString: ptr)
-            } else {
-                throw CIDRError.invalidFormat("Fehler beim Konvertieren der IPv4-Adresse.")
+            canonicalHost = try buffer.withUnsafeMutableBufferPointer { storage in
+                guard let pointer = inet_ntop(AF_INET, &addr4, storage.baseAddress, socklen_t(storage.count)) else {
+                    throw CIDRError.invalidFormat("Fehler beim Konvertieren der IPv4-Adresse.")
+                }
+                return String(cString: pointer)
             }
         }
 
