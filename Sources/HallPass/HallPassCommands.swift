@@ -12,14 +12,14 @@ struct WorkspaceActions {
     let model: HallPassModel
     let available: Bool
     let selectionCount: Int
-    let tableFocused: Bool
+    let selectionIsActive: Bool
     let showsInspector: Bool
     let interface: NetworkInterface
     let perform: (WorkspaceCommand) -> Void
 
     var canEdit: Bool { available && model.canEdit }
-    var canEditSelection: Bool { canEdit && tableFocused && selectionCount == 1 }
-    var canRemove: Bool { canEdit && tableFocused && selectionCount > 0 }
+    var canEditSelection: Bool { canEdit && selectionIsActive && selectionCount == 1 }
+    var canRemove: Bool { canEdit && selectionIsActive && selectionCount > 0 }
 }
 
 private struct WorkspaceActionsKey: FocusedValueKey {

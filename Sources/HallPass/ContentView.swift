@@ -36,7 +36,6 @@ struct ContentView: View {
     @State private var confirmation: DraftConfirmation?
     @State private var showingFilePanel = false
     @State private var window: NSWindow?
-    @FocusState private var tableFocused: Bool
     @FocusState private var searchFocused: Bool
 
     private var interface: NetworkInterface { NetworkInterface(rawValue: interfaceName) ?? .wifi }
@@ -79,7 +78,7 @@ struct ContentView: View {
         }
         .focusedSceneValue(\.hallPassActions, WorkspaceActions(
             model: model, available: available, selectionCount: selectedRows.count,
-            tableFocused: tableFocused && !searchFocused, showsInspector: showsInspector, interface: interface, perform: perform
+            selectionIsActive: !searchFocused, showsInspector: showsInspector, interface: interface, perform: perform
         ))
     }
 
@@ -118,9 +117,6 @@ struct ContentView: View {
         .onChange(of: model.draft) { selection.removeAll() }
         .onChange(of: interfaceName) { selection.removeAll() }
         .onChange(of: searchText) { selection.formIntersection(Set(visibleRows.map(\.id))) }
-        .onChange(of: sheet?.id) {
-            if sheet == nil, model.isLoaded { tableFocused = true }
-        }
     }
 
     private var sidebar: some View {
@@ -171,9 +167,48 @@ struct ContentView: View {
             }
             .width(min: 110, ideal: 125)
         }
-        .focusable()
-        .focused($tableFocused)
         .disabled(model.busy)
+        .searchable(text: $searchText, placement: .toolbar, prompt: "IP-Bereiche suchen")
+        .searchFocused($searchFocused)
+        .onDeleteCommand {
+            guard model.canEdit, available, !searchFocused else { return }
+            model.remove(selection, interface: interface)
+        }
+        .onCopyCommand(perform: selectedRows.isEmpty ? nil : {
+            [NSItemProvider(object: selectedRows.map(\.notation).joined(separator: "\n") as NSString)]
+        })
+        .onKeyPress(.return) {
+            guard available, model.canEdit, !searchFocused, selectedRows.count == 1 else { return .ignored }
+            perform(.edit)
+            return .handled
+        }
+        .contextMenu(forSelectionType: Int.self) { items in
+            Button("IP-Bereich bearbeiten…") { edit(items) }
+                .disabled(items.count != 1 || !model.canEdit)
+            Button("Kopieren") { copy(items) }.disabled(items.isEmpty)
+            Divider()
+            Button("Entfernen", role: .destructive) { model.remove(items, interface: interface) }
+                .disabled(items.isEmpty || !model.canEdit)
+        } primaryAction: { items in
+            edit(items)
+        }
+        .overlay {
+            if visibleRows.isEmpty {
+                ContentUnavailableView {
+                    Label(searchText.isEmpty ? "Keine Freigaben" : "Keine Treffer", systemImage: searchText.isEmpty ? interface.symbol : "magnifyingglass")
+                } description: {
+                    Text(searchText.isEmpty
+                         ? "Für \(interface.title) gelten die regulären lokalen Netzwerkberechtigungen."
+                         : "Kein IP-Bereich entspricht „\(searchText)“.")
+                } actions: {
+                    if searchText.isEmpty {
+                        Button("Netzbereich hinzufügen…") { perform(.add) }.disabled(!model.canEdit)
+                    } else {
+                        Button("Suche löschen") { searchText = "" }
+                    }
+                }
+            }
+        }
         .accessibilityLabel("IP-Bereiche für \(interface.title)")
     }
 
@@ -309,7 +344,7 @@ struct ContentView: View {
         case .edit:
             edit(selection)
         case .remove:
-            guard tableFocused, !searchFocused else { return }
+            guard !searchFocused else { return }
             model.remove(selection, interface: interface)
         case .review:
             guard model.canReview else { return }
@@ -342,7 +377,6 @@ struct ContentView: View {
         case .inspector:
             showsInspector.toggle()
         case .search:
-            tableFocused = false
             searchFocused = true
         case .wifi:
             interfaceName = NetworkInterface.wifi.rawValue
