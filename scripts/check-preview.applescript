@@ -253,7 +253,6 @@ on clickRange(rowIndex)
         log rowSize
         click at {(item 1 of rowPosition) + (item 1 of rowSize) / 2, (item 2 of rowPosition) + (item 2 of rowSize) / 2}
         delay pollDelay
-        log (count selected rows of rangeTable)
     end tell
     delay pollDelay
 end clickRange
