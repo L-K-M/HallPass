@@ -76,7 +76,8 @@ struct WindowConnection: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: ConnectionView, context: Context) {
-        nsView.window?.isDocumentEdited = model.isDirty
+        guard let window = nsView.window, window.isDocumentEdited != model.isDirty else { return }
+        window.isDocumentEdited = model.isDirty
     }
 
     final class ConnectionView: NSView {

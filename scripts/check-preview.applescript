@@ -17,6 +17,7 @@ tell application "System Events"
         my waitForNoSheet()
 
         log "Review additions with CmdS"
+        log (entire contents of window 1)
         keystroke "s" using command down
         my waitForSheet()
         key code escapeKey
