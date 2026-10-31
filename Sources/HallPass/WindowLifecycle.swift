@@ -121,11 +121,11 @@ struct WindowConnection: NSViewRepresentable {
             WindowLifecycle.shared.window = window
             DispatchQueue.main.async { self.connected(window) }
             if CommandLine.arguments.contains("--diagnose-clicks") {
-                mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
+                mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { event in
                     guard let window = event.window, let content = window.contentView else { return event }
                     let point = content.convert(event.locationInWindow, from: nil)
                     let hit = content.hitTest(point)
-                    let message = "Mouse event: number=\(window.windowNumber) window=\(event.locationInWindow) content=\(point) hit=\(String(describing: hit))\n"
+                    let message = "Mouse event: type=\(event.type.rawValue) time=\(event.timestamp) count=\(event.clickCount) number=\(window.windowNumber) window=\(event.locationInWindow) content=\(point) hit=\(String(describing: hit))\n"
                     FileHandle.standardOutput.write(Data(message.utf8))
                     var view = hit
                     while let current = view {
