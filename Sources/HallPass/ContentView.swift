@@ -35,7 +35,6 @@ struct ContentView: View {
     @State private var sheet: WorkspaceSheet?
     @State private var confirmation: DraftConfirmation?
     @State private var showingFilePanel = false
-    @State private var isDropTargeted = false
     @State private var window: NSWindow?
     @FocusState private var tableFocused: Bool
     @FocusState private var searchFocused: Bool
@@ -151,18 +150,6 @@ struct ContentView: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) { notices }
         .safeAreaInset(edge: .bottom, spacing: 0) { statusBar }
-        .dropDestination(for: URL.self) { urls, _ in
-            guard available, model.canEdit, urls.count == 1, let url = urls.first,
-                  url.pathExtension.lowercased() == "json" else { return false }
-            model.importBackup(from: url)
-            return true
-        } isTargeted: { isDropTargeted = $0 }
-        .overlay {
-            if isDropTargeted, available, model.canEdit {
-                RoundedRectangle(cornerRadius: 8).stroke(Color.accentColor, lineWidth: 2)
-                    .padding(4).allowsHitTesting(false)
-            }
-        }
         // Bound wrapping before the split view measures its minimum size.
         .frame(minWidth: 430, maxWidth: .infinity, maxHeight: .infinity)
     }

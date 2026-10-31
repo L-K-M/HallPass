@@ -50,7 +50,7 @@ No background service is installed. HallPass requires no network connection. Hel
 
 Before each real save, HallPass writes the previously loaded state to `~/Library/Application Support/HallPass/Backups/`. **Ablage** (File) contains export, import (⌘O), and **Backupordner öffnen** (Open Backup Folder). Export (⇧⌘E) writes the last loaded or saved state, excluding pending edits.
 
-Imports use a native open sheet, or accept one JSON backup dropped into the loaded configuration. The import replaces the draft and can be undone. Canceling either file panel leaves the configuration untouched. Imports modify system settings only after **Änderungen prüfen → Übernehmen** (Review Changes → Apply).
+Imports use a native open sheet. The import replaces the draft and can be undone. Canceling either file panel leaves the configuration untouched. Imports modify system settings only after **Änderungen prüfen → Übernehmen** (Review Changes → Apply).
 
 **Alle Freigaben entfernen…** (Remove All Exemptions) clears both exemption lists in the draft. After applying and rebooting, apps revert to their regular local-network permissions. Other keys in the same domain are preserved.
 

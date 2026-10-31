@@ -168,7 +168,7 @@ struct HelpView: View {
                     Text("Pro Verbindung sind bis zu \(NetworkConfiguration.maximumNetworksPerInterface) Einträge möglich. Vorhandene Werte werden beim Laden und Exportieren nicht normalisiert.")
                 }
                 Section("Backups und Wiederherstellung") {
-                    Text("Das Menü „Ablage“ enthält Import, Export und den Backupordner. Exportiert wird der zuletzt geladene oder gespeicherte Zustand. Ein Import ersetzt nur den Entwurf und lässt sich widerrufen. JSON-Backups können auch ins Fenster gezogen werden.")
+                    Text("Das Menü „Ablage“ enthält Import, Export und den Backupordner. Exportiert wird der zuletzt geladene oder gespeicherte Zustand. Ein Import ersetzt nur den Entwurf und lässt sich widerrufen.")
                     Text("Vor jedem Übernehmen wird ein Backup in „~/Library/Application Support/HallPass/Backups/“ gesichert. Nicht übernommene Änderungen werden nach einem unerwarteten Ende als Entwurf wiederhergestellt. Vor dem Schreiben prüft HallPass den ursprünglichen Systemzustand erneut.")
                     Text("„Alle Freigaben entfernen“ leert beide Verbindungen im Entwurf. Nach Übernehmen und Neustart gelten wieder die regulären Netzwerkberechtigungen.")
                 }

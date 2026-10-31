@@ -253,6 +253,7 @@ on clickRange(rowIndex)
         log rowSize
         click at {(item 1 of rowPosition) + (item 1 of rowSize) / 2, (item 2 of rowPosition) + (item 2 of rowSize) / 2}
         delay pollDelay
+        if not (get selected of targetRow) then error "The mouse click did not select the network row."
     end tell
     delay pollDelay
 end clickRange
